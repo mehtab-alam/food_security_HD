@@ -1,4 +1,4 @@
-# Food security Indicator predictions using Heterogenous Data
+# Food security indicators predictions using heterogenous data
 
 
 ## Dataset
