@@ -16,3 +16,13 @@ How to download the dataset
 ## Configuration
 
 The [configuration.py](https://github.com/mehtab-alam/food_security_HD/blob/master/configuration.py) file contains the basic configuration files to setup the directories, variables according to their own dataset.
+
+
+## Installing Necessary Libraries
+
+```sh
+pip install pandas
+pip install -U scikit-learn
+pip install GDAL
+pip install tensorflow[and-cuda]
+```
