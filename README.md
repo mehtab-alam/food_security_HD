@@ -5,7 +5,7 @@
 
 How to download the dataset
 
-- For **MAC/Linux** users, Open the terminal and navigate inside your code directory, e.g. (cd food_security_HD). Run the below script to download the data:
+- For **MAC/Linux** users, Open the terminal and navigate to your code directory, e.g. (cd food_security_HD). Run the below script to download the data:
 
 ```sh
 ./data.sh
