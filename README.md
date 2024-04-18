@@ -10,4 +10,4 @@ How to download the dataset
 ```sh
 ./data.sh
 ```
-- For **Windows** users, Download the data using !(Link)[https://drive.google.com/uc?export=download&id=14B4uEtMjXHxtyVqzwK2kvKIXIcNO3uwg]
+- For **Windows** users, Download the data using [Link](https://drive.google.com/uc?export=download&id=14B4uEtMjXHxtyVqzwK2kvKIXIcNO3uwg). Unzip the data and paste it in your code (**food_security_HD**) folder.
