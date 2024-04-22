@@ -24,5 +24,5 @@ The [configuration.py](https://github.com/mehtab-alam/food_security_HD/blob/mast
 pip install pandas
 pip install -U scikit-learn
 pip install GDAL
-pip install tensorflow[and-cuda]
+pip3 install torch torchvision
 ```
