@@ -17,6 +17,8 @@ directory_path = 'data/tanzania/data_explicatives/'
 # Define your regular expression pattern to capture the relevant part of the file name
 #pattern = r'^rw_(.*?)(?:_data|_price)\.csv$'
 
+
+
 pattern = r'^(?:tz_|rw_)(.*?)(?:_data|_price)\.csv$'
 
 # Define the replacement pattern for the new file name
