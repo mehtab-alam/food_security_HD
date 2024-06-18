@@ -11,7 +11,7 @@ import re
 import pandas as pd
 
 # Specify the directory path
-directory_path = 'data/tanzania/data_explicatives/'
+directory_path = 'data/rawanda/data_explicatives/'
 #directory_path = 'data/rawanda/data_explicatives/'
 
 # Define your regular expression pattern to capture the relevant part of the file name

@@ -1,11 +1,14 @@
 # -*- coding: utf-8 -*-
 from logger import log
 from logger import Logs
+import configuration as conf
 from preprocessor import preprocess
 from timeseries_lstm import timeseries_lstm
 from spatial_cnn import cnn
 from feature_fusion_rf import ml
 import argparse, sys
+
+
 
 
 
@@ -47,15 +50,19 @@ def get_country():
                         "'python3 main.py -country=Burkina Faso'", Logs.INFO)
       
 country = get_country()
+'''
+reps = conf.OUTPUT_VARIABLES[country]
+for rep in reps:
+    preprocess(rep, 1, country)
+'''
 if country:
     for r_split in [1]:  # [1, 2, 3, 4, 5]
-        for rep in ["sca"]:  # ['sda', 'sca']
+        for rep in ['sca']:  # ['sda', 'sca']
             # print(rep, " / ", r_split)
             # preprocessing des variables
             preprocess(rep, r_split, country)
-    
             # création des features avec 2 réseaux de neurones
-            #timeseries_lstm(rep, r_split, country) # Timeseries modeling using RNN (LSTM)
+            timeseries_lstm(rep, r_split, country) # Timeseries modeling using RNN (LSTM)
             #cnn(rep, r_split, country)  # CNN sur les pixels de densités de population et occupation du sol (cultures, forêts, constructions)
             # Random forest sur les variables initiales et sur les features
             #ml(rep, r_split, country)

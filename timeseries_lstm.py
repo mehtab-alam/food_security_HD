@@ -179,7 +179,7 @@ def timeseries_lstm(rep, r_split, country):
 
     # Load data
     X_train, X_test, y_train, y_test, w_train, w_test = load_data(rep, r_split, country)
-
+    log(country, "X_train shape is:"+ str(X_train.shape))
     # Prepare your data
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)

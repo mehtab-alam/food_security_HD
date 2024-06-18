@@ -21,8 +21,7 @@ PREPROCESS_DATA_DIR = "staging_data" #data_intermediate, data_pipeline
 OUTPUT_DIR = "output" #data_intermediate, data_pipeline
 PREPROCESS_FILES = {
     "timeseries":  "data_timeseries.xlsx",
-    "conjunctural":  "data_conjunctural.xlsx",
-    "structural":  "data_structural.xlsx",
+    "conjunctural_structural":  "data_conjunctural.xlsx",
     "all": "data_preprocessed.xlsx",
 }
 
@@ -57,7 +56,21 @@ SPATIAL_TEMPORAL_GRANULARITY = {"burkina_faso":["REGION", "PROVINCE", "COMMUNE",
                                 "rawanda": [ "province", "district", "year"],
                                 "tanzania": [ "region", "district", "year"]}
 
+SPATIAL_GRANULARITY = {"burkina_faso":SPATIAL_TEMPORAL_GRANULARITY['burkina_faso'][:-1], 
+                                "rawanda": SPATIAL_TEMPORAL_GRANULARITY['rawanda'][:-1],
+                                "tanzania": SPATIAL_TEMPORAL_GRANULARITY['tanzania'][:-1]}
+
+
+FINE_SP_GRANULARITY = {"burkina_faso": SPATIAL_TEMPORAL_GRANULARITY['burkina_faso'][2], 
+                                "rawanda": SPATIAL_TEMPORAL_GRANULARITY['rawanda'][2],
+                                "tanzania": SPATIAL_TEMPORAL_GRANULARITY['tanzania'][2]}
+
+ID_REGIONS = {"burkina_faso":"ID_COM", "rawanda":"DISTRICT_ID", "tanzania": "DISTRICT_ID"}
+
 TEMPORAL_GRANULARITY = {"burkina_faso":"ANNEE", "rawanda":"year", "tanzania": "year"}
+
+time_window = {"burkina_faso": {'start': 'may', 'end':'November', 'applied_year': 'same'} , "rawanda":{'start': 'march', 'end':'april', 'applied_year': 'previous'},
+               "tanzania": {'start': 'march', 'end':'april', 'applied_year': 'previous'}}
 
 # =============================================================================#
 # Variables Lists: Time Series, Conjuctural and structural variables           #
@@ -68,6 +81,8 @@ vars_timeseries = [
     "smt",
     "tmax",
     "tmin",
+    "beans",
+    "rice"
 ]  # Features used in the code : ['rainfall', 'maize', 'smt', 'tmax', 'tmin', 'ndvi','grains']
 vars_conjuctral = [
     "world_bank",

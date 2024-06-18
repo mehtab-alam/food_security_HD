@@ -56,6 +56,6 @@ target_years = [2021,2022,2023]
 print("Population Rasters Running...")
 # Perform interpolation
 interpolated_rasters = linear_interpolate_rasters(raster_1, raster_2, year_1, year_2, target_years)
-print(interpolated_rasters)
+print(interpolated_rasters[2021].shape)
 
 # Output files will be saved as interpolated_2006.tif, interpolated_2007.tif, etc.

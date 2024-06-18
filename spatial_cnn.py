@@ -124,7 +124,7 @@ def reshape_data(X_train, X_test, patch_size):
 
 
 def initialize_parameters(L):
-    hm_epochs = 1
+    hm_epochs = 10
     batch_size = 500
     nbfilter1 = 32
     nbfilter2 = 64
