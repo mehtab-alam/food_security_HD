@@ -21,26 +21,28 @@ PREPROCESS_DATA_DIR = "staging_data" #data_intermediate, data_pipeline
 OUTPUT_DIR = "output" #data_intermediate, data_pipeline
 PREPROCESS_FILES = {
     "timeseries":  "data_timeseries.xlsx",
-    "conjunctural_structural":  "data_conjunctural.xlsx",
+    "conjunctural_structural":  "data_conjunctural_structural.xlsx",
     "all": "data_preprocessed.xlsx",
 }
 
 # =============================================================================#
 # Datasets: Countries Data                                                     #
 # =============================================================================#
-countries = {"burkina_faso":"burkina_faso", "rawanda":"rawanda", "tanzania": "tanzania"}
+countries = {"burkina_faso":"burkina_faso", "rwanda":"rwanda", "tanzania": "tanzania"}
 
 # =============================================================================#
 # Output: Prediction Variables                                                 #
 # =============================================================================#
 
-OUTPUT_VARIABLES = {"burkina_faso":["sca", "sda"], "rawanda": ["fcs", "hdds"], "tanzania": ["fcs", "hdds"]}
+OUTPUT_VARIABLES = {"burkina_faso":{"regression":["sca", "sda"],"classification":["class_sca", "class_sda"]}, 
+                    "rwanda": {"regression":["fcs", "hdds"],"classification":["class_fcs", "class_hdds"]}, 
+                    "tanzania": {"regression":["fcs", "hdds"],"classification":["class_fcs", "class_hdds"]}}
 
 # =============================================================================#
 # Survey Response File                                                         #
 # =============================================================================#
-RESPONSE_FILE = {"burkina_faso":"rep_epa_2009-2018.xlsx","rawanda":"rep_epa_2006-2021.xlsx",
-                 "tanzania":"rep_epa_2010-2022.xlsx"}  # Name of the response file
+RESPONSE_FILE = {"burkina_faso":"rep_epa_2009-2018.xlsx","rwanda":"rep_epa_2006-2021.xlsx",
+                 "tanzania":"rep_epa_2011-2023.xlsx"}  # Name of the response file
 
 # =============================================================================#
 # Features Directory                                                           #
@@ -52,25 +54,32 @@ FEATURES_DIRECTORY =  "features/"
 # Spatio-temporal Granularity                                                  #
 # =============================================================================#
 
+SHAPE_FILE = {"burkina_faso": os.path.join("shape","bf_shape.shp"),"rwanda": os.path.join("shape","rwanda_shape.shp"),
+                 "tanzania":os.path.join("shape","tz_shape.shp")} 
+
 SPATIAL_TEMPORAL_GRANULARITY = {"burkina_faso":["REGION", "PROVINCE", "COMMUNE", "ANNEE"], 
-                                "rawanda": [ "province", "district", "year"],
+                                "rwanda": [ "province", "district", "year"],
                                 "tanzania": [ "region", "district", "year"]}
 
 SPATIAL_GRANULARITY = {"burkina_faso":SPATIAL_TEMPORAL_GRANULARITY['burkina_faso'][:-1], 
-                                "rawanda": SPATIAL_TEMPORAL_GRANULARITY['rawanda'][:-1],
+                                "rwanda": SPATIAL_TEMPORAL_GRANULARITY['rwanda'][:-1],
                                 "tanzania": SPATIAL_TEMPORAL_GRANULARITY['tanzania'][:-1]}
 
 
 FINE_SP_GRANULARITY = {"burkina_faso": SPATIAL_TEMPORAL_GRANULARITY['burkina_faso'][2], 
-                                "rawanda": SPATIAL_TEMPORAL_GRANULARITY['rawanda'][2],
-                                "tanzania": SPATIAL_TEMPORAL_GRANULARITY['tanzania'][2]}
+                                "rwanda": SPATIAL_TEMPORAL_GRANULARITY['rwanda'][1],
+                                "tanzania": SPATIAL_TEMPORAL_GRANULARITY['tanzania'][1]}
 
-ID_REGIONS = {"burkina_faso":"ID_COM", "rawanda":"DISTRICT_ID", "tanzania": "DISTRICT_ID"}
+ID_REGIONS = {"burkina_faso":"ID_COM", "rwanda":"DISTRICT_ID", "tanzania": "DISTRICT_ID"}
 
-TEMPORAL_GRANULARITY = {"burkina_faso":"ANNEE", "rawanda":"year", "tanzania": "year"}
+TEMPORAL_GRANULARITY = {"burkina_faso":"ANNEE", "rwanda":"year", "tanzania": "year"}
 
-time_window = {"burkina_faso": {'start': 'may', 'end':'November', 'applied_year': 'same'} , "rawanda":{'start': 'march', 'end':'april', 'applied_year': 'previous'},
+time_window = {"burkina_faso": {'start': 'may', 'end':'November', 'applied_year': 'same'} , "rwanda":{'start': 'march', 'end':'april', 'applied_year': 'previous'},
                "tanzania": {'start': 'march', 'end':'april', 'applied_year': 'previous'}}
+
+cnn_settings = {"burkina_faso": {'length': 10, 'step': 30} , "rwanda":{'length': 6, 'step': 3},
+               "tanzania": {'length': 8, 'step': 4} }
+
 
 # =============================================================================#
 # Variables Lists: Time Series, Conjuctural and structural variables           #
@@ -81,8 +90,8 @@ vars_timeseries = [
     "smt",
     "tmax",
     "tmin",
-    "beans",
-    "rice"
+    #"beans",
+    #"rice"
 ]  # Features used in the code : ['rainfall', 'maize', 'smt', 'tmax', 'tmin', 'ndvi','grains']
 vars_conjuctral = [
     "world_bank",
@@ -95,7 +104,7 @@ vars_structural = [
     "voilence_events",
     "quality_soil",
     "elevation",
-    "waterways",
+    #"waterways",
 ]  # structural variables = ['hosp_educ', 'acled', 'quality_soil', 'elevation', 'waterways']
 
 # =============================================================================#

@@ -32,8 +32,19 @@ import re
 import configuration as conf
 from osgeo import gdal
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler,RobustScaler
+from shape_to_features import shape_to_raster
+import warnings
+warnings.simplefilter("ignore")
 
-
+def get_indices(df, column, value):
+    # Get the indices of the rows where the column matches the value
+    matching_indices = df.index[df[column] == value].tolist()
+    
+    # Get the indices of the rows where the column does not match the value
+    non_matching_indices = df.index[df[column] != value].tolist()
+    
+    return matching_indices, non_matching_indices
 
 def get_month_number(month):
     month = month.capitalize()  
@@ -186,10 +197,21 @@ def filter_variables(country, data_aggr, var_type):
 def normalize(country, data, var_type):
     log(country, f"{var_type} variables to Normalize:"+ str(list(data.columns)))
     for v in var_type:
-        data.loc[:, data.columns.str.startswith(v)] = (
-            data.loc[:, data.columns.str.startswith(v)]
-            - data.loc[:, data.columns.str.startswith(v)].stack().mean()
-        ) / data.loc[:, data.columns.str.startswith(v)].stack().std()
+        # Get the columns that match the substring
+        columns_to_scale = [col for col in data.columns if col.startswith(v)]
+        # data[columns_to_scale] = (
+        #    data[columns_to_scale]
+        #    - data[columns_to_scale].stack().mean()
+        #    ) / data[columns_to_scale].stack().std()
+        
+        # columns_to_scale = data.columns.str.startswith(v)
+        # # Initialize the MinMaxScaler
+        if len(columns_to_scale) > 0:
+            log(country, "Column to scale:"+ str(columns_to_scale))
+            scaler = MinMaxScaler(feature_range=(-1,1))
+            # Apply the scaler to the selected columns and update the dataframe
+            data.loc[:, columns_to_scale] = scaler.fit_transform(data.loc[:, columns_to_scale])
+
     return data
 
 
@@ -210,7 +232,7 @@ def output_Y(data_aggregate, output):
 def transform_year(date_str):
     # Split the date string by either '/' or '-' and return the first part (year)
     if isinstance(date_str, str):
-        return int(date_str.split('/')[0].split('-')[0])
+        return int(date_str.split('/')[0].split('-')[1])
     return int(date_str)
 
 
@@ -235,21 +257,53 @@ def export(country, data_timeseries, data_conjunctural_structural, data_rep_colu
 # ==========================================================================================#
 # Create directories for features in case if doesn't exists                                 #
 # ==========================================================================================#
-def create_directories(r_split, country):
+def create_directories(r_split, country, algorithm):
     os.makedirs(
-        os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "features_" + conf.OUTPUT_VARIABLES[country][0]), exist_ok=True
+        os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "features_" + conf.OUTPUT_VARIABLES[country][algorithm][0]), exist_ok=True
     )
     os.makedirs(
-        os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY , "features_" + conf.OUTPUT_VARIABLES[country][1]), exist_ok=True
+        os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY , "features_" + conf.OUTPUT_VARIABLES[country][algorithm][1]), exist_ok=True
     )
 
+
+# Define a helper function to extract patches
+def extract_patch(data, i, j, length):
+    half_length = int(length // 2)
+    return data[i - half_length:i + half_length , j - half_length:j + half_length]
+
+
+# Split the Train/Test data 
+def train_test_data_split(country, df_response, tt_split, data_X_timeseries, data_X_CS, data_Y_SCA, data_Y_SDA, data_W, dataInfo, year, r_split):
+    if tt_split == 'percentage':
+        log(country, 'Percentage train/test is selected...')
+        (X_train_timeseries, X_test_timeseries, X_train_CS, X_test_CS, y_train_SCA, y_test_SCA, y_train_SDA, y_test_SDA, w_train, w_test,
+        info_train, info_test) = train_test_split(data_X_timeseries, data_X_CS, data_Y_SCA, data_Y_SDA, data_W, dataInfo, test_size=0.15, random_state=r_split)
+    else: 
+        log(country, 'Temporal train/test is selected...')
+        matching_indices, non_matching_indices = get_indices(df_response, conf.TEMPORAL_GRANULARITY[country], year)
+        X_train_timeseries = np.take(data_X_timeseries, non_matching_indices, axis = 0)
+        X_test_timeseries = np.take(data_X_timeseries, matching_indices, axis = 0)
+        X_train_CS = np.take(data_X_CS, non_matching_indices, axis = 0)
+        X_test_CS = np.take(data_X_CS, matching_indices, axis = 0)
+        y_train_SCA = np.take(data_Y_SCA, non_matching_indices, axis = 0)
+        y_test_SCA = np.take(data_Y_SCA, matching_indices, axis = 0)
+        y_train_SDA = np.take(data_Y_SDA, non_matching_indices, axis = 0)
+        y_test_SDA = np.take(data_Y_SDA, matching_indices, axis = 0)
+        w_train = np.take(data_W, non_matching_indices, axis = 0)
+        w_test = np.take(data_W, matching_indices, axis = 0)
+        info_train = np.take(dataInfo, non_matching_indices, axis = 0)
+        info_test = np.take(dataInfo, matching_indices, axis = 0)
+    
+    return (X_train_timeseries, X_test_timeseries, X_train_CS, X_test_CS, y_train_SCA, y_test_SCA, y_train_SDA, y_test_SDA, w_train, w_test,
+        info_train, info_test) 
+  
 
 # ==========================================================================================#
 # Main Preprocessing Method: Data processing for processing of numerical and spatial data   #
 # ==========================================================================================#
 
 
-def preprocess(rep, r_split, country):
+def preprocess(rep, r_split, country, algorithm, tt_split):
 
     pd.set_option("display.max_columns", None)
     log(country, f"Preprocessing of {country} data started ...", Logs.INFO)
@@ -285,7 +339,7 @@ def preprocess(rep, r_split, country):
     
     #data_aggregation_timeseries.to_excel(os.path.join(conf.PREPROCESS_DATA_DIR, country, "timeseries.xlsx"))
     data_aggregation_timeseries.dropna(
-        subset=conf.OUTPUT_VARIABLES[country], how="all", inplace=True
+        subset=conf.OUTPUT_VARIABLES[country][algorithm], how="all", inplace=True
     )  # Remove rows with response variable Nan
     # read time-series variables
     #data_aggregation_timeseries = data_aggregation_timeseries.drop(columns=data_rep_columns)
@@ -294,8 +348,6 @@ def preprocess(rep, r_split, country):
         data_aggregation_timeseries, conf.vars_timeseries
     )  # Standardization of variables and column names
    
-   
-    
     data_aggregation_timeseries = normalize(country, 
         data_aggregation_timeseries, conf.vars_timeseries
     )  # Normalize variables by mean/STD
@@ -344,7 +396,7 @@ def preprocess(rep, r_split, country):
         data_aggregation[v] = (data_aggregation[v] - data_aggregation[v].mean())/data_aggregation[v].std()
     
     log(country, f"Columns shape {len(column_to_normalize)}:"+ str(column_to_normalize))
-    
+   
     data_X_CS = np.array(
         data_aggregation.loc[
             :, column_to_normalize
@@ -371,10 +423,10 @@ def preprocess(rep, r_split, country):
     #     Storing output information (Y) in numpy array = ['sca','sda']            #
     # =============================================================================#
     data_Y_SCA = output_Y(
-        data_aggregation, conf.OUTPUT_VARIABLES[country][0]
+        data_aggregation, conf.OUTPUT_VARIABLES[country][algorithm][0]
     )  # Return output variable (SCA) Numpy Array
     data_Y_SDA = output_Y(
-        data_aggregation, conf.OUTPUT_VARIABLES[country][1]
+        data_aggregation, conf.OUTPUT_VARIABLES[country][algorithm][1]
     )  # Return output variable (SDA) Numpy Array
     
     # =================================================================================================#
@@ -388,7 +440,7 @@ def preprocess(rep, r_split, country):
     # =================================================================================================#
     # EXPORT : Export the variables data                                                               #
     # =================================================================================================#
-    create_directories(r_split, country)
+    create_directories(r_split, country, algorithm)
     export(country,
         data_aggregation_timeseries,
         data_aggregation,
@@ -407,43 +459,56 @@ def preprocess(rep, r_split, country):
     for i in range(len(data_aggregation)):
         data_W.append([data_aggregation["count"][i]])
     data_W = np.array(data_W)
-
+    
     # =================================================================================================#
     # Train/Test data split                                                                            #
     # =================================================================================================#
-
-    (
-        X_train_timeseries,
-        X_test_timeseries,
-        X_train_CS,
-        X_test_CS,
-        y_train_SCA,
-        y_test_SCA,
-        y_train_SDA,
-        y_test_SDA,
-        w_train,
-        w_test,
-        info_train,
-        info_test,
-    ) = train_test_split(
-        data_X_timeseries,
-        data_X_CS,
-        data_Y_SCA,
-        data_Y_SDA,
-        data_W,
-        dataInfo,
-        test_size=0.15,
-        random_state=r_split,
-    )
-
+    years= list(data_response_src[conf.TEMPORAL_GRANULARITY[country]].unique())
     log(country, "Years list: "+ str(list(data_response_src[conf.TEMPORAL_GRANULARITY[country]].unique())))
+    
+    #tt_split = "temporal" # percentage
+    
+    (X_train_timeseries,
+    X_test_timeseries,
+    X_train_CS,
+    X_test_CS,
+    y_train_SCA,
+    y_test_SCA,
+    y_train_SDA,
+    y_test_SDA,
+    w_train,
+    w_test,
+    info_train,
+    info_test) = train_test_data_split(country, data_response_src, tt_split, data_X_timeseries, data_X_CS, data_Y_SCA, data_Y_SDA, data_W, dataInfo, max(years), r_split)
+    log(country, f'Shape of train/test data: {X_train_timeseries.shape}, {X_test_timeseries.shape}, {X_train_CS.shape}, {X_test_CS.shape}, {y_train_SCA.shape},{y_test_SCA.shape}')   
+        
+    # save explicative variables X
+    np.save(os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "timeseries_x_train.npy"), X_train_timeseries)
+    log(country, "Saving data: "+ os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "timeseries_x_train.npy"), Logs.INFO)
+    np.save(os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "timeseries_x_test.npy"), X_test_timeseries)
+    log(country, "Saving data: "+ os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "timeseries_x_test.npy"), Logs.INFO)
+    
+     # save response Y (SCA)
+    np.save(os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "features_"+ conf.OUTPUT_VARIABLES[country][algorithm][0],"y_train.npy"), y_train_SCA)
+    log(country, "Saving outputs: "+ os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "features_"+ conf.OUTPUT_VARIABLES[country][algorithm][0],"y_train.npy"), Logs.INFO)
+    np.save(os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "features_"+ conf.OUTPUT_VARIABLES[country][algorithm][0],"y_test.npy"), y_test_SCA)
+    log(country, "Saving outputs: "+ os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "features_"+ conf.OUTPUT_VARIABLES[country][algorithm][0],"y_test.npy"), Logs.INFO)
+    
+    # save weights W
+    np.save(os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY + "w_train.npy"), w_train)
+    log(country, "Saving weights: "+ os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "w_train.npy"), Logs.INFO)
+    np.save(os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY + "w_test.npy"), w_test)
+    log(country, "Saving weights: "+ os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "w_test.npy"), Logs.INFO)
+    
+    if rep == 'class':
+        return
+   
     # =============================================================================#
     #     Preprocessing of Spatial Data                                            #
     # =============================================================================#
-
-    raster_com = gdal.Open(os.path.join(conf.DATA_DIRECTORY, country, conf.SPATIAL_DIRECTORY, conf.SPATIAL_TIF_VARS["epa"]))
-    log(country, "Loaded Rasters: "+os.path.join(conf.DATA_DIRECTORY, country, conf.SPATIAL_DIRECTORY, conf.SPATIAL_TIF_VARS["epa"]), Logs.INFO)
-    log(country, "Years list: "+ str(list(data_response_src[conf.TEMPORAL_GRANULARITY[country]].unique())))
+   
+    #raster_com = gdal.Open(os.path.join(conf.DATA_DIRECTORY, country, conf.SPATIAL_DIRECTORY, conf.SPATIAL_TIF_VARS["epa"]))
+    #log(country, "Loaded Rasters: "+os.path.join(conf.DATA_DIRECTORY, country, conf.SPATIAL_DIRECTORY, conf.SPATIAL_TIF_VARS["epa"]), Logs.INFO)
     
     crop = gdal.Open(os.path.join(conf.DATA_DIRECTORY, country, conf.SPATIAL_DIRECTORY, conf.SPATIAL_TIF_VARS["crop"]))  # import crop Data
     log(country, "Loaded Rasters: "+os.path.join(conf.DATA_DIRECTORY, country, conf.SPATIAL_DIRECTORY, conf.SPATIAL_TIF_VARS["crop"]), Logs.INFO)
@@ -456,40 +521,35 @@ def preprocess(rep, r_split, country):
     #     Numpy Arrays of Tif Files: epa, crop, forest and zones                   #
     # =============================================================================#
 
-    raster_com = np.array(raster_com.ReadAsArray())
+    #raster_com = np.array(raster_com.ReadAsArray())
     crop = np.array(crop.ReadAsArray())
     forest = np.array(forest.ReadAsArray())
     zones = np.array(zones.ReadAsArray())
-
+    log(country, "Resulting Numpy Array for Raster replacement:"+ str(crop.shape))
+    #log(country, "ID COM/DISTRICTS:"+ str(list(data_response_src[conf.ID_REGIONS[country]].unique())))
+    raster_com = shape_to_raster(country, data_response_src, conf.FINE_SP_GRANULARITY[country], conf.ID_REGIONS[country], crop.shape)
     dictrep = dict()  # dictionary of answers for each year
     dictpop = dict()  # dictionary of population for each year
+    
+    unique_values, counts = np.unique(raster_com, return_counts=True)
 
+    # Step 3: Display the unique values and their counts
+    # for value, count in zip(unique_values, counts):
+    #     log(country, f'Value: {value}, Count: {count}')
+
+    
     # ================================================================================================================#
     #     Importing Rasters for response and population for each year                                                 #
     #     **TODO: Reduce the redundant data folders e.g. (sca_100m, sda_sda100m)-> should be one folder               #
     # =============================================================================================================== #
     
-    years= list(data_response_src[conf.TEMPORAL_GRANULARITY[country]].unique())
+    
     # import des rasters réponse et population de chaque année
     for annee in years:  # import des rasters réponse et population
-        dictrep[annee] = gdal.Open(os.path.join(conf.DATA_DIRECTORY, country, conf.SPATIAL_DIRECTORY, 
-            rep+"_"
-            + conf.PIXEL
-            + "/epa_"
-            + rep
-            + "_"
-            + str(annee)
-            + ".tif"
-        ))
-        log(country, "Loaded Rasters: "+os.path.join(conf.DATA_DIRECTORY, country, conf.SPATIAL_DIRECTORY, 
-            rep+"_"
-            + conf.PIXEL
-            + "/epa_"
-            + rep
-            + "_"
-            + str(annee)
-            + ".tif"), Logs.INFO)
-    
+        data_response_year = data_response_src[data_response_src[conf.TEMPORAL_GRANULARITY[country]] == annee]
+        dictrep[annee] = shape_to_raster(country, data_response_year, 
+                                          conf.FINE_SP_GRANULARITY[country], 
+                                          rep, crop.shape)
         dictpop[annee] = gdal.Open(os.path.join(conf.DATA_DIRECTORY, country, conf.SPATIAL_DIRECTORY, 
              "population_"
             + conf.PIXEL
@@ -505,88 +565,63 @@ def preprocess(rep, r_split, country):
             + ".tif"
         ), Logs.INFO)
         # Conversion into Numpy Array per year
-        dictrep[annee] = np.array(dictrep[annee].ReadAsArray())
         dictpop[annee] = np.array(dictpop[annee].ReadAsArray())
-
+        
         # Replacement of Zero-value pixel to NAN value
         dictrep[annee][dictrep[annee] <= 0] = np.nan
-        dictpop[annee][dictpop[annee] <= 0] = np.nan
-
+        dictpop[annee][dictpop[annee] < 0] = np.nan
+       
         # Normalization of pixelated poulation (X-mean/std)
-        dictpop[annee] = dictpop[annee] - np.nanmean(dictpop[annee]) / np.nanstd(
-            dictpop[annee]
-        )
+        # dictpop[annee] = dictpop[annee] - np.nanmean(dictpop[annee]) / np.nanstd(
+        #     dictpop[annee]
+        # )
+        #scaler = MinMaxScaler(feature_range=(-1,1))
+        scaler = RobustScaler()
+        dictpop[annee] = scaler.fit_transform(dictpop[annee])
 
+    raster_com[raster_com <= 0] = np.nan
     # ================================================================================================================#
     #     Listing the variables for CNN                                                                               #
     # =============================================================================================================== #
-
+    
+  
     info_pix_cnn = (
         []
     )  # data on the pairs (municipality, year) associated with each pixel
     dataX_CNN = []  # list of population pixel patches
     dataY_CNN = []  # list of response pixels
-    length = 10  # length of patches
-    step = 30  # distance between 2 selected pixels
-
+    length = conf.cnn_settings[country]['length']  # length of patches
+    step = conf.cnn_settings[country]['step']  # distance between 2 selected pixels
+    
+    
+    
     # ================================================================================================================#
     #     Filling the variables declared for CNN                                                                      #
     # =============================================================================================================== #
-    for annee in years:  # pour chaque année
-        for i in range(
-            int(length / 2), dictrep[annee].shape[0] - int(length / 2), step
-        ):  # pixels are scanned horizontally in steps of 30 with a margin = int(length/2)
-            for j in range(
-                int(length / 2), dictrep[annee].shape[1] - int(length / 2), step
-            ):  # pixels are scanned vertically in steps of 30 with a margin = int(length/2)
-                """
-                conditions for integrating a response pixel + a population patch + 3 oqp_sol patches into the CNN dataset:
-                - the response pixel must not be Nan
-                - none of the pixels in the associated population patch must be Nan
-                - all the pixels in the associated population patch must belong to the same municipality as the response pixel
-                """
-                if not (
-                    (np.isnan(dictrep[annee][i, j]))
-                    | (
-                        np.isnan(
-                            dictpop[annee][
-                                i - int(length / 2) : i + int(length / 2),
-                                j - int(length / 2) : j + int(length / 2),
-                            ]
-                        ).any()
-                    )
-                    | (
-                        raster_com[
-                            i - int(length / 2) : i + int(length / 2),
-                            j - int(length / 2) : j + int(length / 2),
-                        ]
-                        != raster_com[i, j]
-                    ).any()
-                ):
-
-                    info_pix_cnn.append([annee, raster_com[i, j], len(info_pix_cnn)])
-                    dataX_CNN.append(
-                        [
-                            dictpop[annee][
-                                i - int(length / 2) : i + int(length / 2),
-                                j - int(length / 2) : j + int(length / 2),
-                            ],
-                            crop[
-                                i - int(length / 2) : i + int(length / 2),
-                                j - int(length / 2) : j + int(length / 2),
-                            ],
-                            forest[
-                                i - int(length / 2) : i + int(length / 2),
-                                j - int(length / 2) : j + int(length / 2),
-                            ],
-                            zones[
-                                i - int(length / 2) : i + int(length / 2),
-                                j - int(length / 2) : j + int(length / 2),
-                            ],
-                        ]
-                    )
-                    dataY_CNN.append([dictrep[annee][i, j]])
-
+    rows = range(int(length / 2), dictrep[annee].shape[0] - int(length / 2), step)
+    cols = range(int(length / 2), dictrep[annee].shape[1] - int(length / 2), step)
+    count = 0
+    for year in years:
+        for row in rows:
+            for col in cols:
+                if np.isnan(dictrep[year][row, col]):
+                    continue
+                if np.isnan(extract_patch(raster_com, row, col, length)).any():
+                    continue
+                if np.isnan(extract_patch(dictpop[annee], row, col, length)).any():
+                    continue
+                
+                info_pix_cnn.append([year, raster_com[row, col], len(info_pix_cnn)])
+                dataX_CNN.append([
+                    extract_patch(dictpop[annee], row, col, length),
+                    extract_patch(crop, row, col, length),
+                    extract_patch(forest,row, col, length),
+                    extract_patch(zones, row, col, length)
+                ])
+                dataY_CNN.append([dictrep[year][row, col]])
+                count = count+1
+    log(country, "No. of CNN features:"+ str(count))          
+    
     # ================================================================================================================#
     #     Conversion of CNN spatial variables into Numpy array                                                        #
     # =============================================================================================================== #
@@ -599,15 +634,12 @@ def preprocess(rep, r_split, country):
     #  transformation of info data into a dataframe for merging pixel info and info (municipality, year) train / test #
     # =============================================================================================================== #
 
-    RASTER_GRANULARITY = "CODE_COM"
-    #RASTER_GRANULARITY = "DISTRICT_ID"
-
+    RASTER_GRANULARITY = conf.ID_REGIONS[country]
+    
     info_pix_cnn = pd.DataFrame(info_pix_cnn, columns=[conf.TEMPORAL_GRANULARITY[country], RASTER_GRANULARITY, "line"]) # CODE_COM RASTER_GRANULARITY, "line"]
     info_train = pd.DataFrame(info_train, columns=[conf.TEMPORAL_GRANULARITY[country], RASTER_GRANULARITY])
     info_test = pd.DataFrame(info_test, columns=[conf.TEMPORAL_GRANULARITY[country], RASTER_GRANULARITY])
-    info_pix_cnn.to_excel(os.path.join(conf.PREPROCESS_DATA_DIR, country,'info_pix_cnn.xlsx'))
-    info_train.to_excel(os.path.join(conf.PREPROCESS_DATA_DIR, country,'info_train.xlsx'))
-    info_test.to_excel(os.path.join(conf.PREPROCESS_DATA_DIR, country,'info_test.xlsx'))
+    
     
     # ================================================================================================================#
     #  Merge pixel info and info (town, year) train and test                                                          #
@@ -661,33 +693,19 @@ def preprocess(rep, r_split, country):
     #loaded_train = np.load(conf.FEATURES_DIRECTORY + "cnn_x_pix_train.npy")
     #print("X-Train Load", type(loaded_train), loaded_train.shape)
 
-    # save explicative variables X
-    np.save(os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "timeseries_x_train.npy"), X_train_timeseries)
-    log(country, "Saving Rasters: "+ os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "timeseries_x_train.npy"), Logs.INFO)
-    np.save(os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "timeseries_x_test.npy"), X_test_timeseries)
-    log(country, "Saving Rasters: "+ os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "timeseries_x_test.npy"), Logs.INFO)
     
     np.save(os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "cs_x_train.npy"), X_train_CS)
     log(country, "Saving Rasters: "+ os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "cs_x_train.npy"), Logs.INFO)
     np.save(os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "cs_x_test.npy"), X_test_CS)
     log(country, "Saving Rasters: "+ os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "cs_x_test.npy"), Logs.INFO)
     
-    # save response Y (SCA)
-    np.save(os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "features_"+ conf.OUTPUT_VARIABLES[country][0],"y_train.npy"), y_train_SCA)
-    log(country, "Saving Rasters: "+ os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "features_"+ conf.OUTPUT_VARIABLES[country][0],"y_train.npy"), Logs.INFO)
-    np.save(os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "features_"+ conf.OUTPUT_VARIABLES[country][0],"y_test.npy"), y_test_SCA)
-    log(country, "Saving Rasters: "+ os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "features_"+ conf.OUTPUT_VARIABLES[country][0],"y_train.npy"), Logs.INFO)
     
-    np.save(os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "features_"+ conf.OUTPUT_VARIABLES[country][1],"y_train.npy"), y_train_SDA)
-    log(country, "Saving Rasters: "+ os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "features_"+ conf.OUTPUT_VARIABLES[country][1],"y_train.npy"), Logs.INFO)
-    np.save(os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "features_"+ conf.OUTPUT_VARIABLES[country][1],"y_test.npy"), y_test_SDA)
-    log(country, "Saving Rasters: "+ os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "features_"+ conf.OUTPUT_VARIABLES[country][1],"y_test.npy"), Logs.INFO)
+    np.save(os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "features_"+ conf.OUTPUT_VARIABLES[country][algorithm][1],"y_train.npy"), y_train_SDA)
+    log(country, "Saving Rasters: "+ os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "features_"+ conf.OUTPUT_VARIABLES[country][algorithm][1],"y_train.npy"), Logs.INFO)
+    np.save(os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "features_"+ conf.OUTPUT_VARIABLES[country][algorithm][1],"y_test.npy"), y_test_SDA)
+    log(country, "Saving Rasters: "+ os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "features_"+ conf.OUTPUT_VARIABLES[country][algorithm][1],"y_test.npy"), Logs.INFO)
    
-    # save weights W
-    np.save(os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY + "w_train.npy"), w_train)
-    log(country, "Saving Rasters: "+ os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "w_train.npy"), Logs.INFO)
-    np.save(os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY + "w_test.npy"), w_test)
-    log(country, "Saving Rasters: "+ os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "w_test.npy"), Logs.INFO)
+  
     # save infos (commune, année) des données train et test
     np.save(os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY + "info_train.npy"), info_train)
     log(country, "Saving Rasters: "+ os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "info_train.npy"), Logs.INFO)

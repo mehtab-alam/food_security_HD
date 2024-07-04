@@ -35,34 +35,43 @@ from ML_late_fusion import ml_late
 # densités de population par pixel de 100m
 
 
-def get_country():
-    parser=argparse.ArgumentParser()
-    parser.add_argument("-country", help="Please select the country \n" +
-                        "python3 main.py -country=burkinafaso")
-    args=parser.parse_args()
+def get_arguments():
+    # Create the parser
+    parser = argparse.ArgumentParser(description="Process some arguments.")
     
-    if args.country is not None:
-        
-        log(args.country, f"\n\nCountry Selected: {args.country}", Logs.INFO)
-        return args.country.lower()
+    # Add arguments
+    parser.add_argument('-country', type=str, required=True, help='The name of the country (burkina_faso/rwanda/tanzania)')
+    parser.add_argument('-algorithm', type=str, required=True, help='The name of the algorithm(classification/regression)')
+    parser.add_argument('-tt_split', type=str, required=False, help='The name of the algorithm(temporal/percentage)')
+    
+    
+    # Parse the arguments
+    args = parser.parse_args()
+    
+    # Access arguments
+    country = args.country
+    algorithm = args.algorithm
+    if args.tt_split is not None:
+        tt_split = args.tt_split
     else:
-        log(args.country, "Run the following command e.g.," +
-                        "'python3 main.py -country=Burkina Faso'", Logs.INFO)
+        tt_split = 'percentage'
+    # Ensure arguments are not None
+    if not country or not algorithm:
+        print("Error: Both -country,-algorithm must be provided.")
+        parser.print_help()
+        sys.exit(1)
+    return country, algorithm, tt_split
       
-country = get_country()
-'''
-reps = conf.OUTPUT_VARIABLES[country]
-for rep in reps:
-    preprocess(rep, 1, country)
-'''
+country, algorithm, tt_split = get_arguments()
+
 if country:
     for r_split in [1]:  # [1, 2, 3, 4, 5]
-        for rep in ['sca']:  # ['sda', 'sca']
+        for rep in [conf.OUTPUT_VARIABLES[country][algorithm][0]]:  # ['sda', 'sca']
             # print(rep, " / ", r_split)
             # preprocessing des variables
-            preprocess(rep, r_split, country)
+            preprocess(rep, r_split, country, algorithm, tt_split)
             # création des features avec 2 réseaux de neurones
-            timeseries_lstm(rep, r_split, country) # Timeseries modeling using RNN (LSTM)
+            #timeseries_lstm(rep, r_split, country) # Timeseries modeling using RNN (LSTM)
             #cnn(rep, r_split, country)  # CNN sur les pixels de densités de population et occupation du sol (cultures, forêts, constructions)
             # Random forest sur les variables initiales et sur les features
             #ml(rep, r_split, country)
