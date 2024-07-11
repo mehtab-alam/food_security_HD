@@ -54,7 +54,7 @@ FEATURES_DIRECTORY =  "features/"
 # Spatio-temporal Granularity                                                  #
 # =============================================================================#
 
-SHAPE_FILE = {"burkina_faso": os.path.join("shape","bf_shape.shp"),"rwanda": os.path.join("shape","rwanda_shape.shp"),
+SHAPE_FILE = {"burkina_faso": os.path.join("shape","bf_shape.shp"),"rwanda": os.path.join("shape","rw_shape.shp"),
                  "tanzania":os.path.join("shape","tz_shape.shp")} 
 
 np_processed = {"burkina_faso": os.path.join("np","burkina_faso"),"rwanda": os.path.join("np","rwanda"),
@@ -70,7 +70,9 @@ SPATIAL_TEMPORAL_GRANULARITY = {"burkina_faso":["REGION", "PROVINCE", "COMMUNE",
 SPATIAL_GRANULARITY = {"burkina_faso":SPATIAL_TEMPORAL_GRANULARITY['burkina_faso'][:-1], 
                                 "rwanda": SPATIAL_TEMPORAL_GRANULARITY['rwanda'][:-1],
                                 "tanzania": SPATIAL_TEMPORAL_GRANULARITY['tanzania'][:-1]}
-
+upper_sp_granularity = {"burkina_faso": "PROVINCE", 
+                                "rwanda": "province",
+                                "tanzania": "region"}
 
 FINE_SP_GRANULARITY = {"burkina_faso": SPATIAL_TEMPORAL_GRANULARITY['burkina_faso'][2], 
                                 "rwanda": SPATIAL_TEMPORAL_GRANULARITY['rwanda'][1],

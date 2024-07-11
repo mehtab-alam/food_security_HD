@@ -12,8 +12,8 @@ from sklearn.metrics import r2_score, accuracy_score
 import math
 from torch.optim.lr_scheduler import StepLR
 from sklearn.preprocessing import StandardScaler
-from visualization import save_classification_map 
-
+from visualization import save_classification_map, save_region_classification_map, plot_confusion_matrix, plot_roc_auc, plot_regression_results 
+import torch.nn.functional as functional
 
 
 # pip install torchinfo
@@ -88,6 +88,7 @@ def train_model(algorithm, model, train_loader, criterion, optimizer):
     total_samples = 0
     all_predictions = []
     all_targets = []
+    all_probabilities = []
     for inputs, targets, weights in train_loader:
         optimizer.zero_grad()
         outputs = model(inputs)  # Outputs should be of shape (N, C)
@@ -107,11 +108,14 @@ def train_model(algorithm, model, train_loader, criterion, optimizer):
         total_samples += inputs.size(0)
         if algorithm == 'classification':
             predictions = torch.argmax(outputs, dim=1).cpu().numpy() + 1
+            probabilities = functional.softmax(outputs, dim=1)
         else:
             predictions = outputs.squeeze().detach().cpu().numpy()
         targets_np = targets.squeeze().detach().cpu().numpy()
         all_predictions.extend(predictions)
         all_targets.extend(targets_np)
+        if algorithm == 'classification':
+            all_probabilities.extend(probabilities.squeeze().detach().cpu().numpy())
     
     epoch_loss = running_loss / total_samples
     if algorithm == 'classification':
@@ -119,7 +123,7 @@ def train_model(algorithm, model, train_loader, criterion, optimizer):
     else:
         score = r2_score(all_targets, all_predictions)
 
-    return epoch_loss, score, all_targets, all_predictions
+    return epoch_loss, score, all_targets, all_predictions, np.array(all_probabilities)
 
 
 
@@ -130,6 +134,7 @@ def evaluate_model(algorithm, model, test_loader, criterion):
     model.eval()
     all_predictions = []
     all_targets = []
+    all_probabilities = []
     running_loss = 0.0
     total_samples = 0
     with torch.no_grad():
@@ -148,11 +153,14 @@ def evaluate_model(algorithm, model, test_loader, criterion):
             total_samples += inputs.size(0)
             if algorithm == 'classification':
                 predictions = torch.argmax(outputs, dim=1).cpu().numpy()  + 1
+                probabilities = functional.softmax(outputs, dim=1)
             else:
                 predictions = outputs.squeeze().detach().cpu().numpy()
             targets_np = targets.squeeze().detach().cpu().numpy()
             all_predictions.extend(predictions)
             all_targets.extend(targets_np)
+            if algorithm == 'classification':
+                all_probabilities.extend(probabilities.squeeze().detach().cpu().numpy())
     
     epoch_loss = running_loss / total_samples
     if algorithm == 'classification':
@@ -160,7 +168,7 @@ def evaluate_model(algorithm, model, test_loader, criterion):
     else:
         score = r2_score(all_targets, all_predictions)
 
-    return epoch_loss, score, all_targets, all_predictions
+    return epoch_loss, score, all_targets, all_predictions, np.array(all_probabilities)
 
 
 # =============================================================================#
@@ -179,7 +187,7 @@ def save_model(country, rep, lstm, best_test_loss, best_test_R2, best_ep):
     # summary(lstm, input_size=(batch_size, nb_inputs))
 
 #Save Results
-def save_results(country, algorithm, rep, test_targets, test_predictions):
+def save_results(country, algorithm, rep, test_targets, test_predictions, test_probabilities):
     data = pd.read_excel(os.path.join(
         conf.DATA_DIRECTORY, country, conf.RESPONSE_FILE[country]))
     years= list(data[conf.TEMPORAL_GRANULARITY[country]].unique())
@@ -192,7 +200,11 @@ def save_results(country, algorithm, rep, test_targets, test_predictions):
     results.to_excel(os.path.join(conf.OUTPUT_DIR, country, "results", algorithm,  rep + '.xlsx'), index=False)
     if algorithm == 'classification':
         save_classification_map(country, algorithm, rep, max(years))
-
+        save_region_classification_map(country, algorithm, rep, max(years))
+        plot_confusion_matrix(country, algorithm, rep, max(years))
+        plot_roc_auc(country, algorithm, rep, max(years), test_probabilities)
+    else:
+        plot_regression_results(country, algorithm, rep, max(years))
 # =============================================================================#
 # Main function                                                                #
 # =============================================================================#
@@ -239,10 +251,10 @@ def timeseries_lstm(rep, algorithm, r_split, country):
     # Training loop
     for epoch in range(hm_epochs):
         # Train the model
-        train_loss, train_score, train_targets, train_predictions = train_model(algorithm, model, train_loader, criterion, optimizer)
+        train_loss, train_score, train_targets, train_predictions, train_probabilities = train_model(algorithm, model, train_loader, criterion, optimizer)
         
         # Evaluate the model
-        test_loss, test_score, test_targets, test_predictions = evaluate_model(algorithm, model, test_loader, criterion)
+        test_loss, test_score, test_targets, test_predictions, test_probabilities = evaluate_model(algorithm, model, test_loader, criterion)
 
         # Logging and saving best model
         log(country, f"Epoch {epoch+1}/{hm_epochs}, Train Loss: {train_loss:.6f}, Test Loss: {test_loss:.6f}, Train Score: {train_score:.6f}, Test Score: {test_score:.6f}")
@@ -253,7 +265,7 @@ def timeseries_lstm(rep, algorithm, r_split, country):
             best_test_R2 = test_score
             best_epoch = epoch + 1
             save_model(country, rep, model, best_test_loss, best_test_R2, best_epoch)
-            save_results(country, algorithm, rep, test_targets, test_predictions)
+            save_results(country, algorithm, rep, test_targets, test_predictions, test_probabilities)
             epochs_no_improve = 0
         else:
             epochs_no_improve += 1
