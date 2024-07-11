@@ -57,6 +57,12 @@ FEATURES_DIRECTORY =  "features/"
 SHAPE_FILE = {"burkina_faso": os.path.join("shape","bf_shape.shp"),"rwanda": os.path.join("shape","rwanda_shape.shp"),
                  "tanzania":os.path.join("shape","tz_shape.shp")} 
 
+np_processed = {"burkina_faso": os.path.join("np","burkina_faso"),"rwanda": os.path.join("np","rwanda"),
+                 "tanzania":os.path.join("np","tanzania")} 
+
+plots = {"burkina_faso": os.path.join("plots","burkina_faso"),"rwanda": os.path.join("plots","rwanda"),
+                 "tanzania":os.path.join("plots","tanzania")} 
+
 SPATIAL_TEMPORAL_GRANULARITY = {"burkina_faso":["REGION", "PROVINCE", "COMMUNE", "ANNEE"], 
                                 "rwanda": [ "province", "district", "year"],
                                 "tanzania": [ "region", "district", "year"]}

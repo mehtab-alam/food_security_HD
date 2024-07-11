@@ -19,7 +19,7 @@ import os
 import configuration as conf
 from sklearn.impute import SimpleImputer
 
-# Path to the data on Google Drive
+
 PATH = conf.FEATURES_DIRECTORY
 
 
@@ -28,19 +28,11 @@ def next_batch(batch_size, X_data, y_data):
     return X_data[idx], y_data[idx]
 
 
+
 class ConvNet(nn.Module):
-    def __init__(
-        self,
-        nbfilter1,
-        nbfilter2,
-        nbfilter3,
-        shapeconv,
-        shapepool,
-        finalshape,
-        L,
-        input_channels=4,
-    ):
+    def __init__(self, nbfilter1, nbfilter2, nbfilter3, shapeconv, shapepool, finalshape, L, input_channels=4):
         super(ConvNet, self).__init__()
+        
         self.conv1 = nn.Conv2d(
             in_channels=input_channels,
             out_channels=nbfilter1,
@@ -59,11 +51,13 @@ class ConvNet(nn.Module):
             kernel_size=shapeconv,
             padding=1,
         )
-        self.pool = nn.MaxPool2d(kernel_size=shapepool, stride=shapepool)
+        
+        # Adjusted pooling layer
+        self.pool = nn.MaxPool2d(kernel_size=shapepool, stride=shapepool, padding=1)
 
         # Calculate the size of the tensor after the final pooling layer
         self._to_linear = self._get_conv_output((input_channels, L, L))
-
+        
         self.fc1 = nn.Linear(self._to_linear, nbfilter3)
         self.out = nn.Linear(nbfilter3, 1)
         self._initialize_weights()
@@ -76,9 +70,12 @@ class ConvNet(nn.Module):
         return n_size
 
     def _forward_features(self, x):
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
-        x = self.pool(F.relu(self.conv3(x)))
+        x = F.relu(self.conv1(x))
+        x = self.pool(x)
+        x = F.relu(self.conv2(x))
+        x = self.pool(x)
+        x = F.relu(self.conv3(x))
+        x = self.pool(x)
         return x
 
     def _initialize_weights(self):
@@ -89,10 +86,7 @@ class ConvNet(nn.Module):
                     nn.init.zeros_(m.bias)
 
     def forward(self, x):
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
-        x = self.pool(F.relu(self.conv3(x)))
-
+        x = self._forward_features(x)
         x = x.view(x.size(0), -1)  # Flatten the tensor for the fully connected layer
         features = F.relu(self.fc1(x))
         outputs = self.out(features)
@@ -101,18 +95,18 @@ class ConvNet(nn.Module):
 
 def load_data(rep, country):
     PATH = os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY)
-    X_train = np.load(os.path.join(PATH + "cnn_x_pix_train.npy"))
-    log(country, "Loading cnn_x_pix_train from: "+ os.path.join(PATH + "cnn_x_pix_train.npy"))
-    X_test = np.load(os.path.join(PATH + "cnn_x_pix_test.npy"))
-    log(country, "Loading cnn_x_pix_test from: "+ os.path.join(PATH + "cnn_x_pix_test.npy"))
-    y_train = np.load(os.path.join(PATH + "cnn_y_pix_train.npy"))
-    log(country, "Loading cnn_y_pix_train from: "+ os.path.join(PATH + "cnn_y_pix_train.npy"))
-    y_test = np.load(os.path.join(PATH + "cnn_y_pix_test.npy"))
-    log(country, "Loading cnn_y_pix_test from: "+ os.path.join(PATH + "cnn_y_pix_test.npy"))
-    y_train_com = np.load(os.path.join(PATH + "features_" + rep + "/y_train.npy"))
-    log(country, "Loading y_train from: "+ os.path.join(PATH + "features_" + rep + "/y_train.npy"))
-    y_test_com = np.load(os.path.join(PATH + "features_" + rep + "/y_test.npy"))
-    log(country, "Loading y_test from: "+ os.path.join(PATH + "features_" + rep + "/y_test.npy"))
+    X_train = np.load(os.path.join(PATH , "cnn_x_pix_train.npy"))
+    log(country, "Loading cnn_x_pix_train from: "+ os.path.join(PATH , "cnn_x_pix_train.npy"))
+    X_test = np.load(os.path.join(PATH , "cnn_x_pix_test.npy"))
+    log(country, "Loading cnn_x_pix_test from: "+ os.path.join(PATH , "cnn_x_pix_test.npy"))
+    y_train = np.load(os.path.join(PATH , "cnn_y_pix_train.npy"))
+    log(country, "Loading cnn_y_pix_train from: "+ os.path.join(PATH , "cnn_y_pix_train.npy"))
+    y_test = np.load(os.path.join(PATH , "cnn_y_pix_test.npy"))
+    log(country, "Loading cnn_y_pix_test from: "+ os.path.join(PATH , "cnn_y_pix_test.npy"))
+    y_train_com = np.load(os.path.join(PATH , "features_" + rep , "y_train.npy"))
+    log(country, "Loading y_train from: "+ os.path.join(PATH , "features_" + rep , "y_train.npy"))
+    y_test_com = np.load(os.path.join(PATH , "features_" + rep , "y_test.npy"))
+    log(country, "Loading y_test from: "+ os.path.join(PATH , "features_" + rep , "y_test.npy"))
 
     return X_train, X_test, y_train, y_test, y_train_com, y_test_com
 
@@ -124,14 +118,14 @@ def reshape_data(X_train, X_test, patch_size):
 
 
 def initialize_parameters(L):
-    hm_epochs = 10
-    batch_size = 500
+    hm_epochs = 30
+    batch_size = 32
     nbfilter1 = 32
     nbfilter2 = 64
     nbfilter3 = 128
     shapeconv = 3
     shapepool = 2
-    finalshape = ceil(L / 8)
+    finalshape = 1
 
     return (
         hm_epochs,
@@ -146,7 +140,7 @@ def initialize_parameters(L):
 
 
 # =============================================================================#
-# Save model and print summary of the model                                                                #
+# Save model and print summary of the model                                    #
 # =============================================================================#
 def save_model(cnn, best_test_loss_R2, best_ep, country):
     os.makedirs(os.path.join(conf.OUTPUT_DIR, country, "models"), exist_ok=True)
@@ -178,7 +172,7 @@ def cnn(rep, r_split, country):
     X_train, X_test, y_train, y_test, y_train_com, y_test_com = load_data(rep, country)
 
     # Reshape data
-    L = 10  # width and length of pixel patches
+    L = conf.cnn_settings[country]['length']  # width and length of pixel patches
     X_train, X_test = reshape_data(X_train, X_test, L)
 
     # Initialize parameters
@@ -197,6 +191,8 @@ def cnn(rep, r_split, country):
     log(country, "Data loading and reshaping complete.")
     log(country, f"Training data shape: {X_train.shape}")
     log(country, f"Test data shape: {X_test.shape}")
+    log(country, f"Training Y shape: {y_train.shape}")
+    log(country, f"Test Y shape: {y_test.shape}")
     log(country, "Parameters initialized.")
 
     # Convert numpy arrays to PyTorch tensors and move to the appropriate device
@@ -215,7 +211,7 @@ def cnn(rep, r_split, country):
     # Define loss function and optimizer
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
     # Training loop
     best_test_loss_R2 = -float("inf")
     for epoch in range(hm_epochs):
@@ -233,7 +229,7 @@ def cnn(rep, r_split, country):
 
             epoch_loss += loss.item()
 
-            model.eval()
+        model.eval()
         with torch.no_grad():
             train_pred, _ = model(X_train_tensor)
             test_pred, _ = model(X_test_tensor)
@@ -257,7 +253,7 @@ def cnn(rep, r_split, country):
                 best_test_loss_R2 = test_R2
                 best_ep = epoch + 1
                 save_model(model, best_test_loss_R2, best_ep, country)
-                        
+        scheduler.step()
                
     #Utilize the best model 
     model = ConvNet(nbfilter1, nbfilter2, nbfilter3, shapeconv, shapepool, finalshape, L).to(device)
@@ -340,8 +336,5 @@ def cnn(rep, r_split, country):
     log(country, f"Final R2 associate with best loss:  {Final_R2:.6f}, Test R^2: {best_test_loss_R2:.6f} reached at epoch: {best_ep}")
     
     log(country, "End CNN on population and land cover data")
-        
-        
-        
         
         

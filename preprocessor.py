@@ -264,8 +264,8 @@ def normalize(country, data, var_type):
         if len(columns_to_scale) > 0:
             log(country, "Column to scale:"+ str(columns_to_scale))
             df = data[columns_to_scale]
-            visualize_distribution(country, df, v)
-            scaler = MinMaxScaler()
+            #visualize_distribution(country, df, v)
+            scaler = MinMaxScaler(feature_range=(-1,1))
             # Apply the scaler to the selected columns and update the dataframe
             data.loc[:, columns_to_scale] = scaler.fit_transform(data.loc[:, columns_to_scale])
 
@@ -365,10 +365,12 @@ def train_test_data_split(country, df_response, tt_split, data_X_timeseries, dat
 def processed_timeseries(country, data_rep, algorithm, data_rep_columns):
      if os.path.exists(os.path.join(conf.np_processed[country], "timeseries.npy")):
          return np.load(os.path.join(conf.np_processed[country], "timeseries.npy"))
+     os.makedirs(os.path.join(conf.np_processed[country]), exist_ok=True)
      data_aggregation_timeseries = read_add_variables(data_rep, country, conf.vars_timeseries, conf.SPATIAL_TEMPORAL_GRANULARITY[country])  
      data_aggregation_timeseries.dropna(subset=conf.OUTPUT_VARIABLES[country][algorithm], how="all", inplace=True)  # Remove rows with response variable Nan
      data_aggregation_timeseries = filter_variables(country,data_aggregation_timeseries, conf.vars_timeseries )  # Standardization of variables and column names
      data_aggregation_timeseries = normalize(country,data_aggregation_timeseries, conf.vars_timeseries)# Normalize variables by mean/STD data_X_timeseries = np.array(
+     data_aggregation_timeseries.to_excel(os.path.join(conf.np_processed[country], "timeseries.xlsx"))
      data_X_timeseries = np.array(data_aggregation_timeseries.loc[:, ~data_aggregation_timeseries.columns.isin(data_rep_columns)])
      os.makedirs(os.path.join(os.path.join(conf.np_processed[country])), exist_ok=True)
      np.save(os.path.join(conf.np_processed[country], "timeseries.npy"), data_X_timeseries)
