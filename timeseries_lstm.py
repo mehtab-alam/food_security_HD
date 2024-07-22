@@ -48,8 +48,13 @@ def load_data(rep, r_split, country):
     log(country, "Loading w_train from: " + os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "w_train.npy"))
     w_test = np.load(os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "w_test.npy"))
     log(country, "Loading w_test from: " + os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "w_test.npy"))
+    
+    info_train = np.load(os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "info_train.npy"))
+    log(country, f"Loading info_train from with {info_train.shape}: " + os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "info_train.npy"))
+    info_test = np.load(os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "info_test.npy"))
+    log(country, f"Loading info_test from with {info_test.shape}: " + os.path.join(conf.PREPROCESS_DATA_DIR, country, conf.FEATURES_DIRECTORY, "info_test.npy"))
 
-    return X_train, X_test, y_train, y_test, w_train, w_test
+    return X_train, X_test, y_train, y_test, w_train, w_test, info_train, info_test
 
 
 # =============================================================================#
@@ -174,44 +179,48 @@ def evaluate_model(algorithm, model, test_loader, criterion):
 # =============================================================================#
 # Save model and print summary of the model                                                                #
 # =============================================================================#
-def save_model(country, rep, lstm, best_test_loss, best_test_R2, best_ep):
-    os.makedirs(os.path.join(conf.OUTPUT_DIR, country, "models", rep), exist_ok=True)
+def save_model(country, rep, tt_split, algorithm, lstm, best_test_loss, best_test_R2, best_ep):
+    os.makedirs(os.path.join(conf.OUTPUT_DIR, country, "models", "lstm", tt_split, rep, algorithm), exist_ok=True)
     torch.save({
             
             'best_ep': best_ep,
             'best_test_loss': best_test_loss,
             'model_state_dict': lstm.state_dict(),
             'best_test_R2': best_test_R2
-        }, os.path.join(conf.OUTPUT_DIR, country, "models", rep,'lstm_epa.pth') )
-    torch.save(lstm, os.path.join(conf.OUTPUT_DIR, country, "models", rep, 'lstm_epa_architecture.pth'))
+        }, os.path.join(conf.OUTPUT_DIR, country, "models", "lstm", tt_split, algorithm, rep,'lstm_epa.pth') )
+    torch.save(lstm, os.path.join(conf.OUTPUT_DIR, country, "models", "lstm", tt_split, algorithm, rep, 'lstm_epa_architecture.pth'))
     # summary(lstm, input_size=(batch_size, nb_inputs))
 
 #Save Results
-def save_results(country, algorithm, rep, test_targets, test_predictions, test_probabilities):
+def save_results(country, algorithm, rep, tt_split, test_targets, test_predictions, y_test_com, test_probabilities):
+   
+    
     data = pd.read_excel(os.path.join(
         conf.DATA_DIRECTORY, country, conf.RESPONSE_FILE[country]))
-    years= list(data[conf.TEMPORAL_GRANULARITY[country]].unique())
-    data = data[data[conf.TEMPORAL_GRANULARITY[country]] == max(years)]
-    data = data[conf.SPATIAL_TEMPORAL_GRANULARITY[country]]
-    os.makedirs(os.path.join(conf.OUTPUT_DIR, country, "results", algorithm), exist_ok=True)
-    output = pd.DataFrame({'label': test_targets, 'prediction': test_predictions})
-    data = data.reset_index(drop=True)
-    results =  pd.concat([data, output], axis=1)
-    results.to_excel(os.path.join(conf.OUTPUT_DIR, country, "results", algorithm,  rep + '.xlsx'), index=False)
+    output = pd.DataFrame({conf.TEMPORAL_GRANULARITY[country]: y_test_com[:, 0].tolist(),  conf.ID_REGIONS[country].upper(): y_test_com[:, 1].tolist(), 
+                           'label': test_targets, 'prediction': test_predictions})
+    
+    results = pd.merge(output, data[[conf.TEMPORAL_GRANULARITY[country], conf.SPATIAL_GRANULARITY[country][-1], conf.SPATIAL_GRANULARITY[country][-2],
+                          conf.ID_REGIONS[country].upper()]], on= [conf.TEMPORAL_GRANULARITY[country], conf.ID_REGIONS[country].upper()], how='inner')
+    rearranged_columns = [conf.TEMPORAL_GRANULARITY[country], conf.SPATIAL_GRANULARITY[country][-1], conf.SPATIAL_GRANULARITY[country][-2],
+                          conf.ID_REGIONS[country].upper(), 'label', 'prediction']
+    results = results[rearranged_columns]
+    os.makedirs(os.path.join(conf.OUTPUT_DIR, country, "results", "lstm", tt_split, algorithm), exist_ok=True)
+    results.to_excel(os.path.join(conf.OUTPUT_DIR, country, "results", "lstm", tt_split, algorithm,  rep + '.xlsx'), index=False)
     if algorithm == 'classification':
-        save_classification_map(country, algorithm, rep, max(years))
-        save_region_classification_map(country, algorithm, rep, max(years))
-        plot_confusion_matrix(country, algorithm, rep, max(years))
-        plot_roc_auc(country, algorithm, rep, max(years), test_probabilities)
+        save_classification_map(country, algorithm, tt_split, "lstm", rep, max(y_test_com[:, 0].tolist()))
+        save_region_classification_map(country, algorithm, tt_split, "lstm", rep, max(y_test_com[:, 0].tolist()))
+        plot_confusion_matrix(country, algorithm, tt_split, "lstm", rep, max(y_test_com[:, 0].tolist()))
+        plot_roc_auc(country, algorithm, tt_split, "lstm", rep, max(y_test_com[:, 0].tolist()), test_probabilities)
     else:
-        plot_regression_results(country, algorithm, rep, max(years))
+        plot_regression_results(country, algorithm, tt_split, "lstm", rep, max(y_test_com[:, 0].tolist()))
 # =============================================================================#
 # Main function                                                                #
 # =============================================================================#
-def timeseries_lstm(rep, algorithm, r_split, country):
+def timeseries_lstm(rep, algorithm, r_split, country, tt_split):
     log(country, "Begin time-series data learning through LSTM model")
 
-    X_train, X_test, y_train, y_test, w_train, w_test = load_data(rep, r_split, country)
+    X_train, X_test, y_train, y_test, w_train, w_test, info_train, info_test = load_data(rep, r_split, country)
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
@@ -229,17 +238,16 @@ def timeseries_lstm(rep, algorithm, r_split, country):
     )
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size)
-
+    model = LSTMModel(input_size=X_train.shape[1], algorithm=algorithm)
     # Initialize model, criterion, optimizer, and scheduler
-    if os.path.exists(os.path.join(conf.OUTPUT_DIR, country, "models",rep, 'lstm_epa.pth')):
-        log(country, "Best LSTM Model Loaded at : "+ os.path.join(conf.OUTPUT_DIR, country, "models",rep, 'lstm_epa.pth'))
-        checkpoint = torch.load(os.path.join(conf.OUTPUT_DIR, country, "models", rep,'lstm_epa.pth'))
-        model = LSTMModel(input_size=X_train.shape[1], algorithm=algorithm)
+    if os.path.exists(os.path.join(conf.OUTPUT_DIR, country, "models",  "lstm", tt_split , algorithm, rep, 'lstm_epa.pth')):
+        log(country, "Best LSTM Model Loaded from : "+ os.path.join(conf.OUTPUT_DIR, country, "models",  "lstm", tt_split , algorithm, rep, 'lstm_epa.pth'))
+        checkpoint = torch.load(os.path.join(conf.OUTPUT_DIR, country, "models",  "lstm", tt_split , algorithm, rep, 'lstm_epa.pth'))
         model.load_state_dict(checkpoint['model_state_dict'])
         best_ep = checkpoint['best_ep']
         best_test_R2 = checkpoint['best_test_R2']
-    else:
-        model = LSTMModel(input_size=X_train.shape[1], algorithm=algorithm)
+    
+       
     criterion = nn.CrossEntropyLoss() if algorithm == 'classification' else nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     #scheduler = StepLR(optimizer, step_size=14, gamma=0.1)
@@ -264,8 +272,8 @@ def timeseries_lstm(rep, algorithm, r_split, country):
             best_test_loss = test_loss
             best_test_R2 = test_score
             best_epoch = epoch + 1
-            save_model(country, rep, model, best_test_loss, best_test_R2, best_epoch)
-            save_results(country, algorithm, rep, test_targets, test_predictions, test_probabilities)
+            save_model(country, rep, tt_split, algorithm, model, best_test_loss, best_test_R2, best_epoch)
+            save_results(country, algorithm, rep, tt_split, test_targets, test_predictions, info_test, test_probabilities)
             epochs_no_improve = 0
         else:
             epochs_no_improve += 1
@@ -276,8 +284,8 @@ def timeseries_lstm(rep, algorithm, r_split, country):
         
         # Adjust learning rate scheduler
         scheduler.step(test_loss)
-    log(country, "Best LSTM Model Saved at : "+ os.path.join(conf.OUTPUT_DIR, country, "models",rep, 'lstm_epa.pth'))
-    checkpoint = torch.load(os.path.join(conf.OUTPUT_DIR, country, "models", rep,'lstm_epa.pth'))
+    log(country, "Best LSTM Model Saved at : "+ os.path.join(conf.OUTPUT_DIR, country, "models", "lstm", tt_split, algorithm, rep,'lstm_epa.pth'))
+    checkpoint = torch.load(os.path.join(conf.OUTPUT_DIR, country, "models", "lstm", tt_split, algorithm, rep,'lstm_epa.pth'))
     best_ep = checkpoint['best_ep']
     best_test_R2 = checkpoint['best_test_R2']
     log(country, f"Test R2 associate with best Score: {best_test_R2:.6f}  reached at epoch: {best_ep}")

@@ -5,6 +5,7 @@ Created on Wed Jun 26 02:43:31 2024
 
 @author: syed
 """
+import fiona
 import geopandas as gpd
 import rasterio
 import configuration as conf

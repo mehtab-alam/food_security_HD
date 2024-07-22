@@ -7,7 +7,7 @@ Created on Thu Jul 11 00:52:15 2024
 """
 
 
-
+import fiona
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
@@ -24,29 +24,58 @@ from matplotlib.colors import ListedColormap, BoundaryNorm
 import seaborn as sns
 import re
 
-def get_upper_granularity_dataframe(country, algorithm, rep):
-    df = pd.read_excel(os.path.join(conf.OUTPUT_DIR, country, "results", algorithm,  rep + '.xlsx'))
+def get_upper_granularity_dataframe(country, algorithm, df):
+    #df = pd.read_excel(os.path.join(conf.OUTPUT_DIR, country, "results", "lstm", algorithm,  rep + '.xlsx'))
     # Group by 'PROVINCE' and count occurrences of each label and prediction
+    
     label = df.groupby(conf.upper_sp_granularity[country])['label'].value_counts().unstack().fillna(0)
     prediction = df.groupby(conf.upper_sp_granularity[country])['prediction'].value_counts().unstack().fillna(0)
-    
+    #difference = df.groupby(conf.upper_sp_granularity[country])['difference'].value_counts().unstack()#.fillna(0)
     
     
     # Find the max count for each 'PROVINCE'
     max_label_counts = label.idxmax(axis=1)
     max_prediction_counts = prediction.idxmax(axis=1)
+    #difference_counts = difference.idxmax(axis=1)
     granularity = conf.upper_sp_granularity[country]
     # Combine the results
     result = pd.DataFrame({
          granularity : label.index,
         'label': max_label_counts,
         'prediction': max_prediction_counts,
-        
+        #'difference': difference_counts
     })
     
     return result
 
-def save_classification_map(country, algorithm, rep, year):
+def get_cnn_dataframe(country, algorithm, rep, tt_split):
+    df = pd.read_excel(os.path.join(conf.OUTPUT_DIR, country, "results", "cnn", tt_split, algorithm,  rep + '.xlsx'))
+    # Group by 'PROVINCE' and count occurrences of each label and prediction
+    label = df.groupby(conf.FINE_SP_GRANULARITY[country])['label'].value_counts().unstack().fillna(0)
+    prediction = df.groupby(conf.FINE_SP_GRANULARITY[country])['prediction'].value_counts().unstack().fillna(0)
+    #difference = df.groupby(conf.FINE_SP_GRANULARITY[country])['difference'].value_counts().unstack().fillna(0)
+    upper_granularity = df.groupby(conf.FINE_SP_GRANULARITY[country])[conf.SPATIAL_GRANULARITY[country][-2]].first().reset_index()
+    
+    # Find the max count for each 'PROVINCE'
+    max_label_counts = label.idxmax(axis=1)
+    max_prediction_counts = prediction.idxmax(axis=1)
+    #difference_counts = difference.idxmax(axis=1)
+    granularity = conf.FINE_SP_GRANULARITY[country]
+    # Combine the results
+    result = pd.DataFrame({
+        
+         granularity : label.index,
+        'label': max_label_counts,
+        'prediction': max_prediction_counts,
+        #'difference': difference_counts
+        
+    }).reset_index(drop=True)
+    result = result.merge(upper_granularity, on=conf.FINE_SP_GRANULARITY[country], how='inner')
+
+    result = result.reset_index(drop=True)
+    return result
+
+def save_classification_map(country, algorithm, tt_split, nn, rep, year):
     # Load the shapefile
     shapefile_path = os.path.join(
         conf.DATA_DIRECTORY, country, conf.SHAPE_FILE[country])
@@ -54,33 +83,55 @@ def save_classification_map(country, algorithm, rep, year):
     
     spatial_granularity = conf.FINE_SP_GRANULARITY[country]
 
-    #attribute = 'attribute'
-    #gdf[attribute] = pd.cut(gdf[attribute], bins=3, labels=['Low', 'Medium', 'High'])
-    df = pd.read_excel(os.path.join(conf.OUTPUT_DIR, country, "results", algorithm,  rep + '.xlsx'))
+    if nn == 'lstm':
+        df = pd.read_excel(os.path.join(conf.OUTPUT_DIR, country, "results", nn, tt_split, algorithm,  rep + '.xlsx'))
+    else:
+        df = get_cnn_dataframe(country, algorithm, rep, tt_split)
+    #print("df columns:", df.shape, list(df.columns))
+   
     gdf[spatial_granularity] = gdf[spatial_granularity].str.upper()
     df[spatial_granularity] = df[spatial_granularity].str.upper()
-    
+   
+   
     gdf = gdf.merge(df, left_on=spatial_granularity, right_on=spatial_granularity)
     # Define the color mapping
+    #gdf = gdf.dropna()
     color_mapping = {1: '#D05C47', 2: '#FEB264', 3: '#AADFAA'}
     
     # Create the subplots
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(25, 10))
     
     country_capital = re.sub(r'_', ' ', country)
     rep_rem_class = re.sub(r'class\_', '', rep)
-    title_inital = country_capital.title() + ' '+ rep_rem_class.upper() 
+    if tt_split == 'temporal':
+        title_inital = country_capital.title() + ' '+ rep_rem_class.upper() + '-' + nn.upper() + ' ('+ str(year)+ ')'
+    else:
+        title_inital = country_capital.title() + ' '+ rep_rem_class.upper() + '-' + nn.upper()
     # Plot the 'prediction' map
+    
+    gdf['difference'] = np.where(gdf['label'] != gdf['prediction'], gdf['label'], np.nan)
+    
     gdf['color'] = gdf['prediction'].map(color_mapping)
+   
+    
+    
     gdf.plot(ax=ax1, color=gdf['color'], edgecolor = 'black')
-    ax1.set_title( title_inital + r' - $\bf{Predicted}$ ('+str(year)+')')
+    ax1.set_title( title_inital + r' - $\bf{Predicted}$') #('+str(year)+')')
     ax1.axis('off')
     
     # Plot the 'label' map
     gdf['color'] = gdf['label'].map(color_mapping)
     gdf.plot(ax=ax2, color=gdf['color'], edgecolor = 'black')
-    ax2.set_title(title_inital + r' - $\bf{Actual}$ ('+str(year)+')')
+    ax2.set_title(title_inital + r' - $\bf{Actual}$ ') #('+str(year)+')')
     ax2.axis('off')
+    
+      # Plot the 'difference' map
+    gdf['color'] = gdf['difference'].map(color_mapping)
+    gdf['color'].fillna('white', inplace=True)
+    gdf.to_excel(os.path.join(conf.OUTPUT_DIR, country, "results", nn, tt_split, algorithm,  'gdf_'+rep + '.xlsx'))
+    gdf.plot(ax=ax3, color=gdf['color'], edgecolor = 'black')
+    ax3.set_title( r'$\bf{Geographic\ Distribution\ of\ Prediction\ Errors}$ ') #('+str(year)+')')
+    ax3.axis('off')
     
     # Create a legend
     custom_labels = {1: 'Poor', 2: 'Borderline', 3: 'Acceptance'}
@@ -89,12 +140,13 @@ def save_classification_map(country, algorithm, rep, year):
     # Add the legend to the first subplot (ax1)
     ax1.legend(handles=patches, loc='upper right')
     ax2.legend(handles=patches, loc='upper right')
+    ax3.legend(handles=patches, loc='upper right')
     # Show the plot
-    plt.savefig(os.path.join(conf.OUTPUT_DIR, country, "results", algorithm,  rep + '.png'))
+    plt.savefig(os.path.join(conf.OUTPUT_DIR, country, "results", nn, tt_split, algorithm,  rep + '.png'))
     plt.close()
 
 
-def save_region_classification_map(country, algorithm, rep, year):
+def save_region_classification_map(country, algorithm, tt_split, nn, rep, year):
     # Load the shapefile
     shapefile_path = os.path.join(
         conf.DATA_DIRECTORY, country, conf.SHAPE_FILE[country])
@@ -102,10 +154,15 @@ def save_region_classification_map(country, algorithm, rep, year):
     
     spatial_granularity = conf.upper_sp_granularity[country]
     province_groups = gdf.groupby(spatial_granularity)
-    #gdf[attribute] = pd.cut(gdf[attribute], bins=3, labels=['Low', 'Medium', 'High'])
-    df = get_upper_granularity_dataframe(country, algorithm, rep)
+    
+    if nn == 'lstm':
+        df = pd.read_excel(os.path.join(conf.OUTPUT_DIR, country, "results", nn, tt_split, algorithm,  rep + '.xlsx'))
+    else:
+        df = get_cnn_dataframe(country, algorithm, rep, tt_split)
+    
+    df = get_upper_granularity_dataframe(country, algorithm, df)
     df.reset_index(drop=True, inplace=True)
-    print(spatial_granularity, list(df.columns)) 
+    #print(spatial_granularity, list(df.columns)) 
     gdf[spatial_granularity] = gdf[spatial_granularity].str.upper()
     df[spatial_granularity] = df[spatial_granularity].str.upper()
     
@@ -116,15 +173,20 @@ def save_region_classification_map(country, algorithm, rep, year):
     color_mapping = {1: '#D05C47', 2: '#FEB264', 3: '#AADFAA'}
     
     # Create the subplots
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(20, 10))
     
     country_capital = re.sub(r'_', ' ', country)
     rep_rem_class = re.sub(r'class\_', '', rep)
-    title_inital = country_capital.title() + ' '+ rep_rem_class.upper() + " "+ spatial_granularity.upper()
+    if tt_split == 'temporal':
+        title_inital = country_capital.title() + ' '+ rep_rem_class.upper() + '-' + nn.upper() + ' ('+ str(year)+ ')'
+    else:
+        title_inital = country_capital.title() + ' '+ rep_rem_class.upper() + '-' + nn.upper()
     # Plot the 'prediction' map
+    gdf['difference'] = np.where(gdf['label'] != gdf['prediction'], gdf['label'], np.nan)
+    
     gdf['color'] = gdf['prediction'].map(color_mapping)
     gdf.plot(ax=ax1, color=gdf['color'])
-    ax1.set_title( title_inital + r' - $\bf{Predicted}$ ('+str(year)+')')
+    ax1.set_title( title_inital + r' - $\bf{Predicted}$ ') #('+str(year)+')')
     ax1.axis('off')
     
     for province, group in province_groups:
@@ -142,20 +204,40 @@ def save_region_classification_map(country, algorithm, rep, year):
     # Plot the 'label' map
     gdf['color'] = gdf['label'].map(color_mapping)
     gdf.plot(ax=ax2, color=gdf['color'])
-    ax2.set_title(title_inital + r' - $\bf{Actual}$ ('+str(year)+')')
+    ax2.set_title(title_inital + r' - $\bf{Actual}$ ') #('+str(year)+')')
     ax2.axis('off')
     
     for province, group in province_groups:
+      # Plot districts of the current province with solid fill
+      group.plot(ax=ax2, facecolor='none', edgecolor='black', linewidth=0.5)
+      province_boundary = group.unary_union.boundary
+      if province_boundary.geom_type == 'MultiLineString':
+          for geom in province_boundary.geoms:
+              x, y = geom.xy
+              ax2.plot(x, y, color='black', linewidth=2)
+      elif province_boundary.geom_type == 'LineString':
+          x, y = province_boundary.xy
+          ax2.plot(x, y, color='black', linewidth=2)
+    
+       # Plot the 'difference' map
+    gdf['color'] = gdf['difference'].map(color_mapping)
+    gdf['color'].fillna('white', inplace=True)
+    gdf.to_excel(os.path.join(conf.OUTPUT_DIR, country, "results", nn, tt_split, algorithm,  'gdf_'+rep + '.xlsx'))
+    gdf.plot(ax=ax3, color=gdf['color'], edgecolor = 'black')
+    ax3.set_title( r'$\bf{Geographic\ Distribution\ of\ Prediction\ Errors}$ ') #('+str(year)+')')
+    ax3.axis('off')
+    
+    for province, group in province_groups:
        # Plot districts of the current province with solid fill
-       group.plot(ax=ax2, facecolor='none', edgecolor='black', linewidth=0.5)
+       group.plot(ax=ax3, facecolor='none', edgecolor='black', linewidth=0.5)
        province_boundary = group.unary_union.boundary
        if province_boundary.geom_type == 'MultiLineString':
            for geom in province_boundary.geoms:
                x, y = geom.xy
-               ax2.plot(x, y, color='black', linewidth=2)
+               ax3.plot(x, y, color='black', linewidth=2)
        elif province_boundary.geom_type == 'LineString':
            x, y = province_boundary.xy
-           ax2.plot(x, y, color='black', linewidth=2)
+           ax3.plot(x, y, color='black', linewidth=2)
     # Create a legend
     custom_labels = {1: 'Poor', 2: 'Borderline', 3: 'Acceptance'}
     patches = [mpatches.Patch(color=color, label=custom_labels[label]) for label, color in color_mapping.items()]
@@ -163,9 +245,10 @@ def save_region_classification_map(country, algorithm, rep, year):
     # Add the legend to the first subplot (ax1)
     ax1.legend(handles=patches, loc='upper right')
     ax2.legend(handles=patches, loc='upper right')
+    ax3.legend(handles=patches, loc='upper right')
     
     # Show the plot
-    plt.savefig(os.path.join(conf.OUTPUT_DIR, country, "results", algorithm,  spatial_granularity + "_" + rep + '.png'))
+    plt.savefig(os.path.join(conf.OUTPUT_DIR, country, "results", nn, tt_split, algorithm, spatial_granularity + "_" + rep + '.png'))
     plt.close()
     
 
@@ -175,8 +258,12 @@ def save_region_classification_map(country, algorithm, rep, year):
 ############################################################################################################################
 
 
-def plot_confusion_matrix(country, algorithm, rep, year): #(y_true, y_pred, country, rep, arch, r_split):
-    df = pd.read_excel(os.path.join(conf.OUTPUT_DIR, country, "results", algorithm,  rep + '.xlsx'))
+def plot_confusion_matrix(country, algorithm, tt_split, nn, rep, year): #(y_true, y_pred, country, rep, arch, r_split):
+    if nn == 'lstm':
+        df = pd.read_excel(os.path.join(conf.OUTPUT_DIR, country, "results", nn, tt_split, algorithm,  rep + '.xlsx'))
+    else:
+        df = get_cnn_dataframe(country, algorithm, rep, tt_split)
+    #df = df.dropna()
     y_true, y_pred = df['label'], df['prediction']
     # Compute confusion matrix
     cm = confusion_matrix(y_true, y_pred)
@@ -194,7 +281,10 @@ def plot_confusion_matrix(country, algorithm, rep, year): #(y_true, y_pred, coun
     
     country_capital = re.sub(r'_', ' ', country)
     rep_rem_class = re.sub(r'class\_', '', rep)
-    title_inital = country_capital.title() + ' '+ rep_rem_class.upper() 
+    if tt_split == 'temporal':
+        title_inital = country_capital.title() + ' '+ rep_rem_class.upper() + '-' + nn.upper() + ' ('+ str(year)+ ')'
+    else:
+        title_inital = country_capital.title() + ' '+ rep_rem_class.upper() + '-' + nn.upper()
     # Plot heatmapclear
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=True,
                 xticklabels=['Poor', 'Borderline', 'Acceptance'], 
@@ -244,23 +334,29 @@ def plot_confusion_matrix(country, algorithm, rep, year): #(y_true, y_pred, coun
     #plt.figtext(0.65, 0.9, 'Metrics', fontsize=14, fontweight='bold', fontname='Arial', ha='center')
 
     # Ensure the output directory exists
-    output_path = os.path.join(conf.OUTPUT_DIR, country, "results", algorithm, rep+ "_confusion_matrix.png")
+    output_path = os.path.join(conf.OUTPUT_DIR, country, "results", nn, tt_split, algorithm, rep+ "_confusion_matrix.png")
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
     # Save the plot
     plt.savefig(output_path, bbox_inches='tight')
     plt.close()
-    print(f"Confusion matrix saved to {output_path}")
+    #print(f"Confusion matrix saved to {output_path}")
 
 
 
 ############################################################################################################################
 #             PLOT AND SAVE ROC-AUC CURVE                                                                                  #
 ############################################################################################################################
-def plot_roc_auc(country, algorithm, rep, year, y_prob):#(y_true, y_prob, country, rep, arch, r_split):
+def plot_roc_auc(country, algorithm, tt_split, nn, rep, year, y_prob):#(y_true, y_prob, country, rep, arch, r_split):
     # Extract the actual variable name from rep (e.g., 'class_fcs' -> 'fcs')
     #rep_name = rep.split('_', 1)[1]
-    df = pd.read_excel(os.path.join(conf.OUTPUT_DIR, country, "results", algorithm,  rep + '.xlsx'))
+    #df = pd.read_excel(os.path.join(conf.OUTPUT_DIR, country, "results", "lstm", algorithm,  rep + '.xlsx'))
+    
+    if nn == 'lstm':
+        df = pd.read_excel(os.path.join(conf.OUTPUT_DIR, country, "results", nn, tt_split, algorithm,  rep + '.xlsx'))
+    else:
+        df = get_cnn_dataframe(country, algorithm, rep, tt_split)
+    
     y_true, y_pred = df['label'], df['prediction']
     num_classes = 3
     class_labels = {1: 'Poor', 2: 'Borderline', 3: 'Acceptance'}
@@ -301,8 +397,10 @@ def plot_roc_auc(country, algorithm, rep, year, y_prob):#(y_true, y_prob, countr
     plt.figure(figsize=(10, 6))
     country_capital = re.sub(r'_', ' ', country)
     rep_rem_class = re.sub(r'class\_', '', rep)
-    title_initial = country_capital.title() + ' ' + rep_rem_class.upper()
-    
+    if tt_split == 'temporal':
+        title_initial = country_capital.title() + ' '+ rep_rem_class.upper() + '-' + nn.upper() + ' ('+ str(year)+ ')'
+    else:
+        title_initial = country_capital.title() + ' '+ rep_rem_class.upper() + '-' + nn.upper()
     # Plot all ROC curves
     for fpr, tpr, roc_auc, color, label in zip(fprs, tprs, roc_aucs, colors, class_labels):
         plt.plot(fpr, tpr, color=colors[color], lw=3,
@@ -324,18 +422,19 @@ def plot_roc_auc(country, algorithm, rep, year, y_prob):#(y_true, y_prob, countr
     plt.grid(True, linestyle='--', alpha=0.7, linewidth=0.5)
   
     # Ensuring the output directory exists
-    output_path = os.path.join(conf.OUTPUT_DIR, country, "results", algorithm,rep + "_roc_auc_curve_.png")
+    output_path = os.path.join(conf.OUTPUT_DIR, country, "results", nn, tt_split, algorithm, rep + "_roc_auc_curve_.png")
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
     # Saving the plot
     plt.savefig(output_path, bbox_inches='tight')
     plt.close()
-    print(f"ROC-AUC curve saved to {output_path}")
+    #print(f"ROC-AUC curve saved to {output_path}")
 
 
-def plot_regression_results(country, algorithm, rep, year):
+def plot_regression_results(country, algorithm, tt_split, nn, rep, year):
     # Load the data
-    df = pd.read_excel(os.path.join(conf.OUTPUT_DIR, country, "results", algorithm, rep + '.xlsx'))
+    df = pd.read_excel(os.path.join(conf.OUTPUT_DIR, country, "results", nn, tt_split, algorithm, rep + '.xlsx'))
+    #df = df.dropna()
     y_true, y_pred = df['label'], df['prediction']
     
     # Create the plot
@@ -359,7 +458,10 @@ def plot_regression_results(country, algorithm, rep, year):
     # Formatting the title
     country_capital = re.sub(r'_', ' ', country)
     rep_rem_class = re.sub(r'class\_', '', rep)
-    title_initial = country_capital.title() + ' ' + rep_rem_class.upper()
+    if tt_split == 'temporal':
+        title_initial = country_capital.title() + ' '+ rep_rem_class.upper() + '-' + nn.upper() + ' ('+ str(year)+ ')'
+    else:
+        title_initial = country_capital.title() + ' '+ rep_rem_class.upper() + '-' + nn.upper()
     
     # Adding title and legend
     plt.title(f'Actual vs Predicted {title_initial}', fontsize=16, fontweight='bold', fontname='Arial')
@@ -374,11 +476,11 @@ def plot_regression_results(country, algorithm, rep, year):
              bbox=dict(boxstyle='round,pad=0.5', edgecolor='black', facecolor='white'))
 
     # Ensuring the output directory exists
-    output_path = os.path.join(conf.OUTPUT_DIR, country, "results", algorithm, rep + "_regression_plot.png")
+    output_path = os.path.join(conf.OUTPUT_DIR, country, "results", nn, tt_split, algorithm, rep + "_regression_plot.png")
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
     # Saving the plot
     plt.savefig(output_path, bbox_inches='tight')
     plt.close()
-    print(f"Regression plot saved to {output_path}")
+    #print(f"Regression plot saved to {output_path}")
     

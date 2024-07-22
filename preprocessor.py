@@ -37,9 +37,11 @@ from shape_to_features import shape_to_raster
 import warnings
 import matplotlib.pyplot as plt
 import seaborn as sns
+import math
+import random
 warnings.simplefilter("ignore")
 
-def get_indices(df, column, value):
+def get_temporal_indices(df, column, value):
     # Get the indices of the rows where the column matches the value
     matching_indices = df.index[df[column] == value].tolist()
     
@@ -47,6 +49,26 @@ def get_indices(df, column, value):
     non_matching_indices = df.index[df[column] != value].tolist()
     
     return matching_indices, non_matching_indices
+
+def get_saptio_temporal_indices(country, df, column, id_list):
+    # Determine the split point (85% of the original list length)
+    split_point = int(0.85 * len(id_list))
+    
+    # Randomly sample 85% of the values
+    values_train = random.sample(id_list, split_point)
+    log(country , f"Commune/Districts for Training Data : {values_train}")
+    # Calculate the remaining 15% of the values
+    values_test = list(set(id_list) - set(values_train))
+    log(country , f"Commune/Districts for Test Data : {values_test}")
+    # Get the indices of the rows where the column matches the value
+    train_matching_indices = df.index[df[column].isin(values_train)].tolist()
+    
+    # Get the indices of the rows where the column does not match the value
+    test_matching_indices = df.index[df[column].isin(values_test)].tolist()
+    
+    log(country , f"Train Indices Size : {len(train_matching_indices)}, Test Indices Size : {len(test_matching_indices)}")
+    
+    return test_matching_indices, train_matching_indices
 
 def get_month_number(month):
     month = month.capitalize()  
@@ -337,10 +359,16 @@ def train_test_data_split(country, df_response, tt_split, data_X_timeseries, dat
     if tt_split == 'percentage':
         log(country, 'Percentage train/test is selected...')
         (X_train_timeseries, X_test_timeseries, X_train_CS, X_test_CS, y_train_SCA, y_test_SCA, y_train_SDA, y_test_SDA, y_train_class_SCA, y_test_class_SCA, y_train_class_SDA, 
-         y_test_class_SDA, w_train, w_test, info_train, info_test) = train_test_split(data_X_timeseries, data_X_CS, data_Y_SCA, data_Y_SDA, data_Y_CLASS_SCA, data_Y_CLASS_SDA, data_W, dataInfo, test_size=0.15, random_state=r_split)
+         y_test_class_SDA, w_train, w_test, info_train, info_test) = train_test_split(data_X_timeseries, data_X_CS, data_Y_SCA, data_Y_SDA, data_Y_CLASS_SCA, data_Y_CLASS_SDA, data_W, dataInfo, test_size=0.15)#, random_state=r_split)
     else: 
-        log(country, 'Temporal train/test is selected...')
-        matching_indices, non_matching_indices = get_indices(df_response, conf.TEMPORAL_GRANULARITY[country], year)
+        if tt_split == 'temporal':
+            log(country, 'Temporal train/test is selected...')
+            matching_indices, non_matching_indices = get_temporal_indices(df_response, conf.TEMPORAL_GRANULARITY[country], year)
+        else:
+            log(country, 'Spatio-temporal train/test is selected...')
+            id_regions = df_response[conf.ID_REGIONS[country]].unique().tolist()
+            matching_indices, non_matching_indices = get_saptio_temporal_indices(country, df_response, conf.ID_REGIONS[country], id_regions)
+       
         X_train_timeseries = np.take(data_X_timeseries, non_matching_indices, axis = 0)
         X_test_timeseries = np.take(data_X_timeseries, matching_indices, axis = 0)
         X_train_CS = np.take(data_X_CS, non_matching_indices, axis = 0)
@@ -420,7 +448,7 @@ def process_weight(country, data_rep):
 
 
 
-def process_rasters(country, data_rep, rep, years):
+def process_rasters(country, algorithm , data_rep, rep, years):
     if os.path.exists(os.path.join(conf.np_processed[country], "info_pix_cnn.npy")):
        info_pix_cnn = np.load(os.path.join(conf.np_processed[country], "info_pix_cnn.npy")) 
        dataX_CNN = np.load(os.path.join(conf.np_processed[country], "dataX_CNN.npy")) 
@@ -439,6 +467,8 @@ def process_rasters(country, data_rep, rep, years):
     #     Numpy Arrays of Tif Files: epa, crop, forest and zones                   #
     # =============================================================================#
     
+    
+   
     #raster_com = np.array(raster_com.ReadAsArray())
     crop = np.array(crop.ReadAsArray())
     forest = np.array(forest.ReadAsArray())
@@ -497,8 +527,13 @@ def process_rasters(country, data_rep, rep, years):
     dataX_CNN = []  # list of population pixel patches
     dataY_CNN = []  # list of response pixels
     length = conf.cnn_settings[country]['length']  # length of patches
-    step = conf.cnn_settings[country]['step']  # distance between 2 selected pixels
-    
+    #step = conf.cnn_settings[country]['step']  # distance between 2 selected pixels
+    no_of_features = 50000
+    #feature_reduction = 8 if algorithm == 'classification' else 4
+    feature_reduction = 4
+    no_of_pixels = crop.shape[0] * crop.shape[1]
+    step = int(math.sqrt(feature_reduction * no_of_pixels/no_of_features))
+    log(country, f"Step selected for {country} is: {step}")
     # ================================================================================================================#
     #     Filling the variables declared for CNN                                                                      #
     # =============================================================================================================== #
@@ -553,7 +588,7 @@ def preprocess(rep, r_split, country, algorithm, tt_split):
     data_rep_columns = list(
         data_response_src.columns
     ) 
-    log(country, f'Columns of Ground Truth Data:'+ str(data_rep_columns))
+    log(country, 'Columns of Ground Truth Data:'+ str(data_rep_columns))
     data_rep = data_response_src  # Keeping the original response data as it is...
     
     
@@ -619,7 +654,7 @@ def preprocess(rep, r_split, country, algorithm, tt_split):
     w_test,
     info_train,
     info_test) = train_test_data_split(country, data_response_src, tt_split, data_X_timeseries, data_X_CS, data_Y_SCA, data_Y_SDA, data_Y_CLASS_SCA, data_Y_CLASS_SDA, data_W, dataInfo, max(years), r_split)
-    log(country, f'Shape of train/test data: {X_train_timeseries.shape}, {X_test_timeseries.shape}, {X_train_CS.shape}, {X_test_CS.shape}, {y_train_SCA.shape},{y_test_SCA.shape}')   
+    log(country, f'Shape of train/test data: {X_train_timeseries.shape}, {X_test_timeseries.shape}, {info_train.shape}, {info_test.shape}, {y_train_SCA.shape},{y_test_SCA.shape}')   
     
     
     
@@ -677,7 +712,7 @@ def preprocess(rep, r_split, country, algorithm, tt_split):
     
     
     
-    info_pix_cnn, dataX_CNN, dataY_CNN = process_rasters(country, data_response_src, rep, years)
+    info_pix_cnn, dataX_CNN, dataY_CNN = process_rasters(country, algorithm, data_response_src, rep, years)
     dataX_CNN = np.array(dataX_CNN)
     dataY_CNN = np.array(dataY_CNN)
     info_pix_cnn = np.array(info_pix_cnn, dtype=int)

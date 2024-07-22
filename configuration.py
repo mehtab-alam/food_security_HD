@@ -74,9 +74,9 @@ upper_sp_granularity = {"burkina_faso": "PROVINCE",
                                 "rwanda": "province",
                                 "tanzania": "region"}
 
-FINE_SP_GRANULARITY = {"burkina_faso": SPATIAL_TEMPORAL_GRANULARITY['burkina_faso'][2], 
-                                "rwanda": SPATIAL_TEMPORAL_GRANULARITY['rwanda'][1],
-                                "tanzania": SPATIAL_TEMPORAL_GRANULARITY['tanzania'][1]}
+FINE_SP_GRANULARITY = {"burkina_faso": SPATIAL_GRANULARITY['burkina_faso'][-1], 
+                                "rwanda": SPATIAL_GRANULARITY['rwanda'][-1],
+                                "tanzania": SPATIAL_GRANULARITY['tanzania'][-1]}
 
 ID_REGIONS = {"burkina_faso":"ID_COM", "rwanda":"DISTRICT_ID", "tanzania": "DISTRICT_ID"}
 
@@ -85,7 +85,7 @@ TEMPORAL_GRANULARITY = {"burkina_faso":"ANNEE", "rwanda":"year", "tanzania": "ye
 time_window = {"burkina_faso": {'start': 'may', 'end':'November', 'applied_year': 'same'} , "rwanda":{'start': 'march', 'end':'april', 'applied_year': 'previous'},
                "tanzania": {'start': 'march', 'end':'april', 'applied_year': 'previous'}}
 
-cnn_settings = {"burkina_faso": {'length': 10, 'step': 30} , "rwanda":{'length': 6, 'step': 3},
+cnn_settings = {"burkina_faso": {'length': 10, 'step': 30} , "rwanda":{'length': 10, 'step': 4},
                "tanzania": {'length': 8, 'step': 4} }
 
 

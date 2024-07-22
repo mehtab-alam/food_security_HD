@@ -71,8 +71,8 @@ if country:
             # preprocessing des variables
             preprocess(rep, r_split, country, algorithm, tt_split)
             # création des features avec 2 réseaux de neurones
-            timeseries_lstm(rep, algorithm, r_split, country) # Timeseries modeling using RNN (LSTM)
-            #cnn(rep, r_split, country)  # CNN sur les pixels de densités de population et occupation du sol (cultures, forêts, constructions)
+            #timeseries_lstm(rep, algorithm, r_split, country) # Timeseries modeling using RNN (LSTM)
+            cnn(rep, algorithm, r_split, country, tt_split)  # CNN sur les pixels de densités de population et occupation du sol (cultures, forêts, constructions)
             # Random forest sur les variables initiales et sur les features
             #ml(rep, r_split, country)
             # Régression ridge sur les réponses des 3 modèles
