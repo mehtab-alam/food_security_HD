@@ -51,8 +51,13 @@ The output will be found at *'../output/burkina_faso/results/[model]/temporal'*.
 The output will be found at *'../output/rwanda/results/[model]/temporal'*. For instance, the spatial distribution and the confusion matrices for FCS (FCS=SCA) and HDDS (HDDS = SDA) are as follow:
 
 <p align="center">
-  <img src="results/image1.png" alt="Image 1" width="45%" />
-  <img src="results/image2.png" alt="Image 2" width="45%" />
+  <img src="results/class_sca_confusion_matrix.png" alt="Image 1" width="45%" />
+  <img src="results/class_sda_confusion_matrix.png" alt="Image 2" width="45%" />
+</p>
+
+<p align="center">
+  <img src="results/class_sca.png" alt="Image 1" width="45%" />
+  <img src="results/class_sda.png" alt="Image 2" width="45%" />
 </p>
 
 3. For Tanzania 
