@@ -60,11 +60,11 @@ The output will be found at *'../output/rwanda/results/[model]/temporal'*. For i
 <table>
   <tr>
     <td align="center"><b>FCS</b></td>
-    <td><img src="results/class_sca.png" alt="Image 1" width="80%" /></td>
+    <td><img src="results/class_sca.png" alt="Image 1" width="100%" /></td>
   </tr>
   <tr>
     <td align="center"><b>HDDS</b></td>
-    <td><img src="results/class_sda.png" alt="Image 2" width="80%" /></td>
+    <td><img src="results/class_sda.png" alt="Image 2" width="100%" /></td>
   </tr>
 </table>
 
