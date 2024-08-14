@@ -57,12 +57,12 @@ The output will be found at *'../output/rwanda/results/[model]/temporal'*. For i
 </p>
 
 **Spatial Distribution Comparison of FCS (Actual vs. Predicted Values):**
-<table>
-  <tr width="100%">
+<table width="100%">
+  <tr>
     <td align="center" width="10%"><b>FCS</b></td>
     <td><img src="results/class_sca.png" alt="Image 1" width="90%" /></td>
   </tr>
-  <tr width="100%">
+  <tr>
     <td align="center" width="10%"><b>HDDS</b></td>
     <td><img src="results/class_sda.png" alt="Image 2"  width="90%"/></td>
   </tr>
