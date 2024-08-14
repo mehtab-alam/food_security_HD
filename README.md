@@ -33,3 +33,26 @@ The application offers multiple running configurations, including:
 1. **country:** Options include burkina_faso, rwanda, and tanzania.
 2. **algorithm:** Choice between classification or regression.
 3. **tt_split:** Data split selection of temporal, spatio-temporal, or percentage methods for dividing input data.
+
+In the article, we presented the classification results of *temporal*, and *spatio-temporal* split. To perform this, please run the following commands:
+
+**Temporal Split:**
+
+1. For Burkina Faso 
+```sh
+ python main.py -country=burkina_faso -algorithm=classification -tt_split=temporal 
+```
+The output will be found at *'../output/burkina_faso/results/[model]/[tt_split]'*.  
+
+2. For Rwanda
+```sh
+ python main.py -country=rwanda -algorithm=classification -tt_split=temporal 
+```
+The output will be found at *'../output/rwanda/results/[model]/[tt_split]'*.  
+
+3. For Tanzania 
+```sh
+ python main.py -country=burkina_faso -algorithm=classification -tt_split=temporal 
+```
+The output will be found at *'../output/tanzania/results/[model]/[tt_split]'*. 
+
