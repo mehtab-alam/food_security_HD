@@ -42,17 +42,46 @@ In the article, we presented the classification results of *temporal*, and *spat
 ```sh
  python main.py -country=burkina_faso -algorithm=classification -tt_split=temporal 
 ```
-The output will be found at *'../output/burkina_faso/results/[model]/[tt_split]'*.  
+The output will be found at *'../output/burkina_faso/results/[model]/temporal'*. The *[model]* directory are the following: lstm, cnn.  
 
 2. For Rwanda
 ```sh
  python main.py -country=rwanda -algorithm=classification -tt_split=temporal 
 ```
-The output will be found at *'../output/rwanda/results/[model]/[tt_split]'*.  
+The output will be found at *'../output/rwanda/results/[model]/temporal'*. For instance, the spatial distribution and the confusion matrices for FCS (FCS=SCA) and HDDS (HDDS = SDA) are as follow:
+
+<p align="center">
+  <img src="results/image1.png" alt="Image 1" width="45%" />
+  <img src="results/image2.png" alt="Image 2" width="45%" />
+</p>
 
 3. For Tanzania 
 ```sh
  python main.py -country=burkina_faso -algorithm=classification -tt_split=temporal 
 ```
-The output will be found at *'../output/tanzania/results/[model]/[tt_split]'*. 
+The output will be found at *'../output/tanzania/results/[model]/temporal'*. 
+
+
+**Note:** For each country, it may take **15-20** minutes to complete the experiment.
+
+**Spatio-temporal Split:**
+
+1. For Burkina Faso 
+```sh
+ python main.py -country=burkina_faso -algorithm=classification -tt_split=spatio-temporal 
+```
+The output will be found at *'../output/burkina_faso/results/[model]/spatio-temporal'*. The *[model]* directory are the following: lstm, cnn.  
+
+2. For Rwanda
+```sh
+ python main.py -country=rwanda -algorithm=classification -tt_split=spatio-temporal 
+```
+The output will be found at *'../output/rwanda/results/[model]/spatio-temporal'*.  
+
+3. For Tanzania 
+```sh
+ python main.py -country=burkina_faso -algorithm=classification -tt_split=spatio-temporal 
+```
+The output will be found at *'../output/tanzania/results/[model]/spatio-temporal'*. 
+
 
