@@ -180,7 +180,7 @@ def evaluate_model(algorithm, model, test_loader, criterion):
 # Save model and print summary of the model                                                                #
 # =============================================================================#
 def save_model(country, rep, tt_split, algorithm, lstm, best_test_loss, best_test_R2, best_ep):
-    os.makedirs(os.path.join(conf.OUTPUT_DIR, country, "models", "lstm", tt_split, rep, algorithm), exist_ok=True)
+    os.makedirs(os.path.join(conf.OUTPUT_DIR, country, "models", "lstm", tt_split, algorithm , rep), exist_ok=True)
     torch.save({
             
             'best_ep': best_ep,
