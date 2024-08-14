@@ -56,7 +56,7 @@ The output will be found at *'../output/rwanda/results/[model]/temporal'*. For i
   <img src="results/class_sda_confusion_matrix.png" alt="Image 2" width="25%" />
 </p>
 
-**Spatial Distribution:**
+
 <p align="center">
   <b> Spatial Distribution Comparison of FCS (Actual vs. Predicted Values)</b>  
   <img src="results/class_sca.png" alt="Image 1" width="80%" />
