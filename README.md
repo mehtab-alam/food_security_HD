@@ -59,9 +59,9 @@ The output will be found at *'../output/rwanda/results/[model]/temporal'*. For i
 **Spatial Distribution:**
 <p align="center">
   <b> Spatial Distribution Comparison of FCS (Actual vs. Predicted Values)</b>  
-  <img src="results/class_sca.png" alt="Image 1" width="50%" />
- <b> Spatial Distribution Comparison of HDDS (Actual vs. Predicted Values)</b>  
-  <img src="results/class_sda.png" alt="Image 2" width="50%" />
+  <img src="results/class_sca.png" alt="Image 1" width="80%" />
+ <b> Spatial Distribution Comparison of HDDS</b>  
+  <img src="results/class_sda.png" alt="Image 2" width="80%" />
 </p>
 
 3. For Tanzania 
