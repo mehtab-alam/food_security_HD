@@ -52,21 +52,17 @@ The output will be found at *'../output/rwanda/results/[model]/temporal'*. For i
 
 **Confusion Matrix:**
 <p align="center">
-  <img src="results/class_sca_confusion_matrix.png" alt="Image 1" width="25%" />
-  <img src="results/class_sda_confusion_matrix.png" alt="Image 2" width="25%" />
+  <img src="results/class_sca_confusion_matrix.png" alt="Image 1" width="30%" />
+  <img src="results/class_sda_confusion_matrix.png" alt="Image 2" width="30%" />
 </p>
 
 **Spatial Distribution Comparison of FCS (Actual vs. Predicted Values):**
-<table width="100%">
-  <tr>
-    <td align="center" width="10%"><b>FCS</b></td>
-    <td><img src="results/class_sca.png" alt="Image 1" width="90%" /></td>
-  </tr>
-  <tr>
-    <td align="center" width="10%"><b>HDDS</b></td>
-    <td><img src="results/class_sda.png" alt="Image 2"  width="90%"/></td>
-  </tr>
-</table>
+<p align="center" style="display: flex; align-items: center; justify-content: center;">
+  <span style="margin-right: 10px;"><b>FCS</b></span>
+  <img src="results/class_sca.png" alt="Image 1" width="45%" />
+  <span style="margin: 0 10px;"><b>HDDS</b></span>
+  <img src="results/class_sda.png" alt="Image 2" width="45%" />
+</p>
 
 3. For Tanzania 
 ```sh
