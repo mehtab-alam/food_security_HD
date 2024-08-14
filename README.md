@@ -1,7 +1,7 @@
 # Food security indicators predictions using heterogenous data
 
 
-## Dataset
+# 1. Dataset
 
 How to download the dataset
 
@@ -13,12 +13,12 @@ How to download the dataset
 - For **Windows** users, Download the data using [Link](https://www.googleapis.com/drive/v3/files/1VJFM0wuljsc2Dhdxus8h0IdcE9-0iJJu?alt=media&key=AIzaSyBo55XtefB47P_CPLKosGvnpEi3pQs5lCk). Unzip the data and paste it in your code (**food_security_HD**) folder.
 
 
-## Configuration
+# 2. Configuration
 
 The [configuration.py](https://github.com/mehtab-alam/food_security_HD/blob/master/configuration.py) file contains the basic configuration files to setup the directories, variables according to their own dataset.
 
 
-## Installing Necessary Libraries
+# 3. Installing Necessary Libraries
 
 ```sh
 pip install pandas
@@ -27,7 +27,7 @@ pip install GDAL
 pip3 install torch torchvision
 ```
 
-## How to run the application
+# 4. How to run the application
 
 The application offers multiple running configurations, including:
 1. **country:** Options include burkina_faso, rwanda, and tanzania.
@@ -36,7 +36,7 @@ The application offers multiple running configurations, including:
 
 In the article, we presented the classification results of *temporal*, and *spatio-temporal* split. To perform this, please run the following commands:
 
-# 1. Temporal Split:
+## 4.1 Temporal Split:
 
 1. For Burkina Faso 
 ```sh
@@ -85,7 +85,7 @@ The output will be found at *'../output/tanzania/results/[model]/temporal'*.
 
 **Note:** For each country, it may take **15-20** minutes to complete the experiment.
 
-# 2. Spatio-temporal Split:
+## 4.2 Spatio-temporal Split:
 
 1. For Burkina Faso 
 ```sh
