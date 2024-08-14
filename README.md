@@ -26,3 +26,10 @@ pip install -U scikit-learn
 pip install GDAL
 pip3 install torch torchvision
 ```
+
+## How to run the application
+
+The application offers multiple running configurations, including:
+1. **country:** Options include burkina_faso, rwanda, and tanzania.
+2. **algorithm:** Choice between classification or regression.
+3. **tt_split:** Data split selection of temporal, spatio-temporal, or percentage methods for dividing input data.
