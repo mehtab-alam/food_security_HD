@@ -58,8 +58,8 @@ The output will be found at *'../output/rwanda/results/[model]/temporal'*. For i
 
 **Spatial Distribution:**
 <p align="center">
-  <img src="results/class_sca.png" alt="Image 1" width="55%" />
-  <img src="results/class_sda.png" alt="Image 2" width="55%" />
+  <img src="results/class_sca.png" alt="Image 1" width="50%" />
+  <img src="results/class_sda.png" alt="Image 2" width="50%" />
 </p>
 
 3. For Tanzania 
