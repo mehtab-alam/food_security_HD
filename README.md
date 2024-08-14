@@ -36,7 +36,7 @@ The application offers multiple running configurations, including:
 
 In the article, we presented the classification results of *temporal*, and *spatio-temporal* split. To perform this, please run the following commands:
 
-**Temporal Split:**
+# 1. Temporal Split:
 
 1. For Burkina Faso 
 ```sh
@@ -85,7 +85,7 @@ The output will be found at *'../output/tanzania/results/[model]/temporal'*.
 
 **Note:** For each country, it may take **15-20** minutes to complete the experiment.
 
-**Spatio-temporal Split:**
+# 2. Spatio-temporal Split:
 
 1. For Burkina Faso 
 ```sh
