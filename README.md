@@ -34,7 +34,7 @@ The application offers multiple running configurations, including:
 2. **algorithm:** Choice between classification or regression.
 3. **tt_split:** Data split selection of temporal, spatio-temporal, or percentage methods for dividing input data.
 
-**Note:** For CNN model, we set the *epoch=50* as optimize time configuration. For better performance, one can increase the epoch value. 
+**Note:** For CNN model, we set the ```python epoch=50``` as optimize time configuration. For better performance, one can increase the epoch value. 
 
 
 In the article, we presented the classification results of *temporal*, and *spatio-temporal* split. To perform this, please run the following commands:
