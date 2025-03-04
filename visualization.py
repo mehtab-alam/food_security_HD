@@ -83,10 +83,12 @@ def save_classification_map(country, algorithm, tt_split, nn, rep, year):
     
     spatial_granularity = conf.FINE_SP_GRANULARITY[country]
 
-    if nn == 'lstm':
-        df = pd.read_excel(os.path.join(conf.OUTPUT_DIR, country, "results", nn, tt_split, algorithm,  rep + '.xlsx'))
-    else:
+    if nn == 'cnn':
         df = get_cnn_dataframe(country, algorithm, rep, tt_split)
+    else:
+        df = pd.read_excel(os.path.join(conf.OUTPUT_DIR, country, "results", nn, tt_split, algorithm,  rep + '.xlsx'))
+    
+        
     #print("df columns:", df.shape, list(df.columns))
    
     gdf[spatial_granularity] = gdf[spatial_granularity].str.upper()
@@ -155,10 +157,10 @@ def save_region_classification_map(country, algorithm, tt_split, nn, rep, year):
     spatial_granularity = conf.upper_sp_granularity[country]
     province_groups = gdf.groupby(spatial_granularity)
     
-    if nn == 'lstm':
-        df = pd.read_excel(os.path.join(conf.OUTPUT_DIR, country, "results", nn, tt_split, algorithm,  rep + '.xlsx'))
+    if nn == 'cnn':
+        df = get_cnn_dataframe(country, algorithm, rep, tt_split)  
     else:
-        df = get_cnn_dataframe(country, algorithm, rep, tt_split)
+        df = pd.read_excel(os.path.join(conf.OUTPUT_DIR, country, "results", nn, tt_split, algorithm,  rep + '.xlsx'))
     
     df = get_upper_granularity_dataframe(country, algorithm, df)
     df.reset_index(drop=True, inplace=True)
@@ -259,10 +261,11 @@ def save_region_classification_map(country, algorithm, tt_split, nn, rep, year):
 
 
 def plot_confusion_matrix(country, algorithm, tt_split, nn, rep, year): #(y_true, y_pred, country, rep, arch, r_split):
-    if nn == 'lstm':
-        df = pd.read_excel(os.path.join(conf.OUTPUT_DIR, country, "results", nn, tt_split, algorithm,  rep + '.xlsx'))
-    else:
+    if nn == 'cnn':
         df = get_cnn_dataframe(country, algorithm, rep, tt_split)
+       
+    else:
+         df = pd.read_excel(os.path.join(conf.OUTPUT_DIR, country, "results", nn, tt_split, algorithm,  rep + '.xlsx'))
     #df = df.dropna()
     y_true, y_pred = df['label'], df['prediction']
     # Compute confusion matrix
@@ -352,10 +355,10 @@ def plot_roc_auc(country, algorithm, tt_split, nn, rep, year, y_prob):#(y_true, 
     #rep_name = rep.split('_', 1)[1]
     #df = pd.read_excel(os.path.join(conf.OUTPUT_DIR, country, "results", "lstm", algorithm,  rep + '.xlsx'))
     
-    if nn == 'lstm':
-        df = pd.read_excel(os.path.join(conf.OUTPUT_DIR, country, "results", nn, tt_split, algorithm,  rep + '.xlsx'))
-    else:
+    if nn == 'cnn':
         df = get_cnn_dataframe(country, algorithm, rep, tt_split)
+    else:
+        df = pd.read_excel(os.path.join(conf.OUTPUT_DIR, country, "results", nn, tt_split, algorithm,  rep + '.xlsx'))
     
     y_true, y_pred = df['label'], df['prediction']
     num_classes = 3

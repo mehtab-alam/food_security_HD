@@ -80,8 +80,9 @@ class LSTMModel(nn.Module):
 
     def forward(self, x):
         out, _ = self.lstm(x)
+        features = out # out[:, -1, :]
         out = self.fc(out)
-        return out
+        return out, features
 
 
 # =============================================================================#
@@ -92,11 +93,12 @@ def train_model(algorithm, model, train_loader, criterion, optimizer):
     running_loss = 0.0
     total_samples = 0
     all_predictions = []
+    all_features = []
     all_targets = []
     all_probabilities = []
     for inputs, targets, weights in train_loader:
         optimizer.zero_grad()
-        outputs = model(inputs)  # Outputs should be of shape (N, C)
+        outputs, features = model(inputs)  # Outputs should be of shape (N, C)
         targets = targets.view(-1)  # Ensure targets are of shape (N,)
         if algorithm == 'classification':
             
@@ -118,6 +120,8 @@ def train_model(algorithm, model, train_loader, criterion, optimizer):
             predictions = outputs.squeeze().detach().cpu().numpy()
         targets_np = targets.squeeze().detach().cpu().numpy()
         all_predictions.extend(predictions)
+        
+        all_features.extend(features.detach().numpy())
         all_targets.extend(targets_np)
         if algorithm == 'classification':
             all_probabilities.extend(probabilities.squeeze().detach().cpu().numpy())
@@ -127,8 +131,8 @@ def train_model(algorithm, model, train_loader, criterion, optimizer):
         score = accuracy_score(all_targets, all_predictions)
     else:
         score = r2_score(all_targets, all_predictions)
-
-    return epoch_loss, score, all_targets, all_predictions, np.array(all_probabilities)
+    
+    return epoch_loss, score, all_targets, all_predictions, all_features, np.array(all_probabilities)
 
 
 
@@ -139,12 +143,13 @@ def evaluate_model(algorithm, model, test_loader, criterion):
     model.eval()
     all_predictions = []
     all_targets = []
+    all_features = []
     all_probabilities = []
     running_loss = 0.0
     total_samples = 0
     with torch.no_grad():
         for inputs, targets, weights in test_loader:
-            outputs = model(inputs)
+            outputs, features = model(inputs)
             targets = targets.view(-1)  # Ensure targets are of shape (N,)
             if algorithm == 'classification':
                 adjusted_targets = targets - 1
@@ -161,8 +166,10 @@ def evaluate_model(algorithm, model, test_loader, criterion):
                 probabilities = functional.softmax(outputs, dim=1)
             else:
                 predictions = outputs.squeeze().detach().cpu().numpy()
-            targets_np = targets.squeeze().detach().cpu().numpy()
+            targets_np = targets.detach().cpu().numpy()
             all_predictions.extend(predictions)
+           
+            all_features.extend(features.detach().numpy())
             all_targets.extend(targets_np)
             if algorithm == 'classification':
                 all_probabilities.extend(probabilities.squeeze().detach().cpu().numpy())
@@ -172,9 +179,17 @@ def evaluate_model(algorithm, model, test_loader, criterion):
         score = accuracy_score(all_targets, all_predictions)
     else:
         score = r2_score(all_targets, all_predictions)
+   
+    return epoch_loss, score, all_targets, all_predictions, all_features, np.array(all_probabilities)
 
-    return epoch_loss, score, all_targets, all_predictions, np.array(all_probabilities)
 
+def save_features(country, rep, tt_split, algorithm, lstm, train_features, test_features):
+     os.makedirs(os.path.join(conf.PREPROCESS_DATA_DIR, country, "features", "lstm", tt_split, algorithm , rep), exist_ok=True)
+     np.save(os.path.join(conf.PREPROCESS_DATA_DIR, country, "features", "lstm", tt_split, algorithm , rep, 'lstm_x_train.npy'), train_features)
+     log(country, "trained features saved: "+ os.path.join(conf.PREPROCESS_DATA_DIR, country, "features", "lstm", tt_split, algorithm , rep, 'lstm_x_train.npy'))
+     np.save(os.path.join(conf.PREPROCESS_DATA_DIR, country, "features", "lstm", tt_split, algorithm , rep, 'lstm_x_test.npy'), test_features)
+     log(country, "test features saved: "+ os.path.join(conf.PREPROCESS_DATA_DIR, country, "features", "lstm", tt_split, algorithm , rep, 'lstm_x_test.npy'))
+     
 
 # =============================================================================#
 # Save model and print summary of the model                                                                #
@@ -211,6 +226,8 @@ def save_results(country, algorithm, rep, tt_split, test_targets, test_predictio
         save_classification_map(country, algorithm, tt_split, "lstm", rep, max(y_test_com[:, 0].tolist()))
         save_region_classification_map(country, algorithm, tt_split, "lstm", rep, max(y_test_com[:, 0].tolist()))
         plot_confusion_matrix(country, algorithm, tt_split, "lstm", rep, max(y_test_com[:, 0].tolist()))
+        #print("Predictions shape", test_predictions.shape)
+        print("probabilities shape", test_probabilities.shape)
         plot_roc_auc(country, algorithm, tt_split, "lstm", rep, max(y_test_com[:, 0].tolist()), test_probabilities)
     else:
         plot_regression_results(country, algorithm, tt_split, "lstm", rep, max(y_test_com[:, 0].tolist()))
@@ -259,10 +276,10 @@ def timeseries_lstm(rep, algorithm, r_split, country, tt_split):
     # Training loop
     for epoch in range(hm_epochs):
         # Train the model
-        train_loss, train_score, train_targets, train_predictions, train_probabilities = train_model(algorithm, model, train_loader, criterion, optimizer)
+        train_loss, train_score, train_targets, train_predictions, train_features, train_probabilities = train_model(algorithm, model, train_loader, criterion, optimizer)
         
         # Evaluate the model
-        test_loss, test_score, test_targets, test_predictions, test_probabilities = evaluate_model(algorithm, model, test_loader, criterion)
+        test_loss, test_score, test_targets, test_predictions, test_features, test_probabilities = evaluate_model(algorithm, model, test_loader, criterion)
 
         # Logging and saving best model
         log(country, f"Epoch {epoch+1}/{hm_epochs}, Train Loss: {train_loss:.6f}, Test Loss: {test_loss:.6f}, Train Score: {train_score:.6f}, Test Score: {test_score:.6f}")
@@ -273,6 +290,7 @@ def timeseries_lstm(rep, algorithm, r_split, country, tt_split):
             best_test_R2 = test_score
             best_epoch = epoch + 1
             save_model(country, rep, tt_split, algorithm, model, best_test_loss, best_test_R2, best_epoch)
+            save_features(country, rep, tt_split, algorithm, model, train_features, test_features)
             save_results(country, algorithm, rep, tt_split, test_targets, test_predictions, info_test, test_probabilities)
             epochs_no_improve = 0
         else:
@@ -290,60 +308,5 @@ def timeseries_lstm(rep, algorithm, r_split, country, tt_split):
     best_test_R2 = checkpoint['best_test_R2']
     log(country, f"Test R2 associate with best Score: {best_test_R2:.6f}  reached at epoch: {best_ep}")
     
-    
-    # Instantiate your LSTM model
-    
-    # lstm_saved = LSTMModel(nb_inputs)
-    
-    
-    # # Load the saved model
-    # checkpoint = torch.load(os.path.join(conf.OUTPUT_DIR, country, "models",'lstm_epa.pth'))
-    # lstm_saved.load_state_dict(checkpoint['model_state_dict'])
-    # lstm_saved.eval()
-    
-    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    # lstm_saved.to(device)    
-    # with torch.no_grad():
-    #     log(country, "Best Model features are saving ...\n")
-    #     os.makedirs(os.path.join(conf.OUTPUT_DIR, country, conf.FEATURES_DIRECTORY,'features_' + rep + '_'+ str(r_split)), exist_ok=True)
-    #     #log(country, "Features saved at: "+ os.path.join(conf.OUTPUT_DIR, country, conf.FEATURES_DIRECTORY,'features_' + rep + '_'+ str(r_split)))
-    #     X_train_tensor = torch.tensor(X_train, dtype=torch.float32).to(device)
-    #     X_test_tensor = torch.tensor(X_test, dtype=torch.float32).to(device)
-    #     # Get features and predictions for training data
-    #     trained_predictions, trained_features = lstm_saved(X_train_tensor)
-
-    #     # Get features and predictions for test data
-    #     test_predictions, test_features = lstm_saved(X_test_tensor)
-    #     log(country, 'Type of test_predictions is:'+str(type(test_predictions)))
-    #     log(country, "X_test_tensor is :"+str(y_test))
-    #     test_predictions = test_predictions.numpy()
-    #     test_predictions = [int(round_(num,2)) for num in test_predictions]
-    #     log(country, "test_predictions is :"+str(test_predictions))
-        
-    #     for i, feature in enumerate(trained_features):
-    #         log(country, f"trained features {i} Shape: {feature.shape}")
-    #     for i, feature in enumerate(test_features):
-    #         log(country, f"test features {i} Shape: {feature.shape}")
-    #     log(country, "trained predictions Shape:"+ str(trained_predictions.shape))
-    #     log(country, "test predictions Shape:"+ str(test_predictions.shape))
-        
-    #     trained_features = np.stack((trained_features[0].numpy(), trained_features[1].numpy()), axis=0)
-    #     test_features = np.stack((test_features[0].numpy(), test_features[1].numpy()), axis=0)
-        
-    #     np.save(os.path.join(conf.OUTPUT_DIR, country, conf.FEATURES_DIRECTORY,'features_' + rep + '_'+ str(r_split), 'lstm_feat_x_train.npy'), trained_features)
-    #     log(country, "trained feature saved: "+ os.path.join(conf.OUTPUT_DIR, country, conf.FEATURES_DIRECTORY,'features_' + rep + '_'+ str(r_split), 'lstm_feat_x_train.npy'))
-    #     np.save(os.path.join(conf.OUTPUT_DIR, country, conf.FEATURES_DIRECTORY,'features_' + rep + '_'+ str(r_split),  'lstm_feat_x_test.npy'), test_features)
-    #     log(country, "test feature saved: "+ os.path.join(conf.OUTPUT_DIR, country, conf.FEATURES_DIRECTORY,'features_' + rep + '_'+ str(r_split),  'lstm_feat_x_test.npy'))
-    #     np.save(os.path.join(conf.OUTPUT_DIR, country, conf.FEATURES_DIRECTORY,'features_' + rep + '_'+ str(r_split),  'lstm_pred_train.npy'), trained_predictions)
-    #     log(country, "trained predictions saved: "+ os.path.join(conf.OUTPUT_DIR, country, conf.FEATURES_DIRECTORY,'features_' + rep + '_'+ str(r_split),  'lstm_pred_train.npy'))
-    #     np.save(os.path.join(conf.OUTPUT_DIR, country, conf.FEATURES_DIRECTORY,'features_' + rep + '_'+ str(r_split),  'lstm_pred_test.npy'), test_predictions)
-    #     log(country, "test predictions saved: "+ os.path.join(conf.OUTPUT_DIR, country, conf.FEATURES_DIRECTORY,'features_' + rep + '_'+ str(r_split),  'lstm_pred_test.npy'))
-        
-    # #trained_features_np = trained_features.numpy()
-    # #test_features_np = test_features.numpy() 
-    # best_ep = checkpoint['best_ep']
-    # best_test_loss_R2 = checkpoint['best_test_loss_R2']
-    # log(country, "Features saved in folder \"" + os.path.join(conf.OUTPUT_DIR, country, conf.FEATURES_DIRECTORY,'features_' + rep + '_'+ str(r_split)) + "\"")
-    # log(country, f"Test R2 associate with best loss: {best_test_loss_R2:.6f}  reached at epoch: {best_ep}")
 
     log(country, "End time-series data learning through LSTM model")
